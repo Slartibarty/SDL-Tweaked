@@ -1947,8 +1947,8 @@ int SDL_RegisterApp(const char *name, Uint32 style, void *hInst)
     SDL_assert(SDL_Appname == NULL);
     if (name == NULL) {
         name = "SDL_app";
-#if defined(CS_BYTEALIGNCLIENT) || defined(CS_OWNDC)
-        style = (CS_BYTEALIGNCLIENT | CS_OWNDC);
+#if defined(CS_OWNDC)
+        style = CS_OWNDC;
 #endif
     }
     SDL_Appname = WIN_UTF8ToString(name);
