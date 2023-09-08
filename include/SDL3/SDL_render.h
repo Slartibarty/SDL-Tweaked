@@ -42,7 +42,7 @@
  *  of the many good 3D engines.
  *
  *  These functions must be called from the main thread.
- *  See this bug for details: http://bugzilla.libsdl.org/show_bug.cgi?id=1995
+ *  See this bug for details: https://github.com/libsdl-org/SDL/issues/986
  */
 
 #ifndef SDL_render_h_
@@ -777,10 +777,6 @@ extern DECLSPEC void SDLCALL SDL_UnlockTexture(SDL_Texture *texture);
 
 /**
  * Set a texture as the current rendering target.
- *
- * Before using this function, you should check the
- * `SDL_RENDERER_TARGETTEXTURE` bit in the flags of SDL_RendererInfo to see if
- * render targets are supported.
  *
  * The default render target is the window for which the renderer was created.
  * To stop rendering to a texture and render to the window again, call this
@@ -1558,7 +1554,7 @@ extern DECLSPEC void *SDLCALL SDL_GetRenderMetalLayer(SDL_Renderer *renderer);
  * Note that as of SDL 2.0.18, this will return NULL if Metal refuses to give
  * SDL a drawable to render to, which might happen if the window is
  * hidden/minimized/offscreen. This doesn't apply to command encoders for
- * render targets, just the window's backbacker. Check your return values!
+ * render targets, just the window's backbuffer. Check your return values!
  *
  * \param renderer The renderer to query
  * \returns an `id<MTLRenderCommandEncoder>` on success, or NULL if the

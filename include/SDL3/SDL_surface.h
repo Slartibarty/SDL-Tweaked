@@ -131,11 +131,14 @@ extern DECLSPEC SDL_Surface *SDLCALL SDL_CreateSurface
     (int width, int height, Uint32 format);
 
 /**
- * Allocate a new RGB surface with with a specific pixel format and existing
- * pixel data.
+ * Allocate a new RGB surface with a specific pixel format and existing pixel
+ * data.
  *
  * No copy is made of the pixel data. Pixel data is not managed automatically;
  * you must free the surface before you free the pixel data.
+ *
+ * Pitch is the offset in bytes from one row of pixels to the next, e.g.
+ * `width*4` for `SDL_PIXELFORMAT_RGBA8888`.
  *
  * You may pass NULL for pixels and 0 for pitch to create a surface that you
  * will fill in with valid values later.
@@ -270,7 +273,8 @@ extern DECLSPEC SDL_Surface *SDLCALL SDL_LoadBMP(const char *file);
  *
  * \param surface the SDL_Surface structure containing the image to be saved
  * \param dst a data stream to save to
- * \param freedst non-zero to close the stream after being written
+ * \param freedst if SDL_TRUE, calls SDL_RWclose() on `dst` before returning,
+ *                even in the case of an error
  * \returns 0 on success or a negative error code on failure; call
  *          SDL_GetError() for more information.
  *
@@ -279,7 +283,7 @@ extern DECLSPEC SDL_Surface *SDLCALL SDL_LoadBMP(const char *file);
  * \sa SDL_LoadBMP_RW
  * \sa SDL_SaveBMP
  */
-extern DECLSPEC int SDLCALL SDL_SaveBMP_RW(SDL_Surface *surface, SDL_RWops *dst, int freedst);
+extern DECLSPEC int SDLCALL SDL_SaveBMP_RW(SDL_Surface *surface, SDL_RWops *dst, SDL_bool freedst);
 
 /**
  * Save a surface to a file.
@@ -774,15 +778,16 @@ extern DECLSPEC int SDLCALL SDL_FillSurfaceRects
  * \param srcrect the SDL_Rect structure representing the rectangle to be
  *                copied, or NULL to copy the entire surface
  * \param dst the SDL_Surface structure that is the blit target
- * \param dstrect the SDL_Rect structure representing the target rectangle in
- *                the destination surface, filled with the actual rectangle
- *                used after clipping
+ * \param dstrect the SDL_Rect structure representing the x and y position in
+ *                the destination surface. On input the width and height are
+ *                ignored (taken from srcrect), and on output this is filled
+ *                in with the actual rectangle used after clipping.
  * \returns 0 on success or a negative error code on failure; call
  *          SDL_GetError() for more information.
  *
  * \since This function is available since SDL 3.0.0.
  *
- * \sa SDL_BlitSurface
+ * \sa SDL_BlitSurfaceScaled
  */
 extern DECLSPEC int SDLCALL SDL_BlitSurface
     (SDL_Surface *src, const SDL_Rect *srcrect,
@@ -810,7 +815,6 @@ extern DECLSPEC int SDLCALL SDL_BlitSurface
 extern DECLSPEC int SDLCALL SDL_BlitSurfaceUnchecked
     (SDL_Surface *src, const SDL_Rect *srcrect,
      SDL_Surface *dst, const SDL_Rect *dstrect);
-
 
 /**
  * Perform a fast, low quality, stretch blit between two surfaces of the same
@@ -868,6 +872,8 @@ extern DECLSPEC int SDLCALL SDL_SoftStretchLinear(SDL_Surface *src,
  *          SDL_GetError() for more information.
  *
  * \since This function is available since SDL 3.0.0.
+ *
+ * \sa SDL_BlitSurface
  */
 extern DECLSPEC int SDLCALL SDL_BlitSurfaceScaled
     (SDL_Surface *src, const SDL_Rect *srcrect,

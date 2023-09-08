@@ -308,10 +308,10 @@ expression e;
 + SDL_PauseAudioDevice(e)
 |
 - SDL_PauseAudioDevice(e, 0)
-+ SDL_PlayAudioDevice(e)
++ SDL_ResumeAudioDevice(e)
 |
 - SDL_PauseAudioDevice(e, SDL_FALSE)
-+ SDL_PlayAudioDevice(e)
++ SDL_ResumeAudioDevice(e)
 )
 
 @@
@@ -321,7 +321,7 @@ expression e, pause_on;
 + if (pause_on) {
 +    SDL_PauseAudioDevice(e);
 + } else {
-+    SDL_PlayAudioDevice(e);
++    SDL_ResumeAudioDevice(e);
 + }
 
 
@@ -940,19 +940,19 @@ typedef SDL_ControllerTouchpadEvent, SDL_GamepadTouchpadEvent;
 @@
 @@
 - SDL_CONTROLLER_BUTTON_PADDLE1
-+ SDL_GAMEPAD_BUTTON_PADDLE1
++ SDL_GAMEPAD_BUTTON_RIGHT_PADDLE1
 @@
 @@
 - SDL_CONTROLLER_BUTTON_PADDLE2
-+ SDL_GAMEPAD_BUTTON_PADDLE2
++ SDL_GAMEPAD_BUTTON_LEFT_PADDLE1
 @@
 @@
 - SDL_CONTROLLER_BUTTON_PADDLE3
-+ SDL_GAMEPAD_BUTTON_PADDLE3
++ SDL_GAMEPAD_BUTTON_RIGHT_PADDLE2
 @@
 @@
 - SDL_CONTROLLER_BUTTON_PADDLE4
-+ SDL_GAMEPAD_BUTTON_PADDLE4
++ SDL_GAMEPAD_BUTTON_LEFT_PADDLE2
 @@
 @@
 - SDL_CONTROLLER_BUTTON_RIGHTSHOULDER
@@ -2591,51 +2591,51 @@ typedef SDL_cond, SDL_Condition;
 @@
 @@
 - AUDIO_F32
-+ SDL_AUDIO_F32
++ SDL_AUDIO_F32LE
 @@
 @@
 - AUDIO_F32LSB
-+ SDL_AUDIO_F32LSB
++ SDL_AUDIO_F32LE
 @@
 @@
 - AUDIO_F32MSB
-+ SDL_AUDIO_F32MSB
++ SDL_AUDIO_F32BE
 @@
 @@
 - AUDIO_F32SYS
-+ SDL_AUDIO_F32SYS
++ SDL_AUDIO_F32
 @@
 @@
 - AUDIO_S16
-+ SDL_AUDIO_S16
++ SDL_AUDIO_S16LE
 @@
 @@
 - AUDIO_S16LSB
-+ SDL_AUDIO_S16LSB
++ SDL_AUDIO_S16LE
 @@
 @@
 - AUDIO_S16MSB
-+ SDL_AUDIO_S16MSB
++ SDL_AUDIO_S16BE
 @@
 @@
 - AUDIO_S16SYS
-+ SDL_AUDIO_S16SYS
++ SDL_AUDIO_S16
 @@
 @@
 - AUDIO_S32
-+ SDL_AUDIO_S32
++ SDL_AUDIO_S32LE
 @@
 @@
 - AUDIO_S32LSB
-+ SDL_AUDIO_S32LSB
++ SDL_AUDIO_S32LE
 @@
 @@
 - AUDIO_S32MSB
-+ SDL_AUDIO_S32MSB
++ SDL_AUDIO_S32BE
 @@
 @@
 - AUDIO_S32SYS
-+ SDL_AUDIO_S32SYS
++ SDL_AUDIO_S32
 @@
 @@
 - AUDIO_S8
@@ -2689,4 +2689,64 @@ typedef SDL_cond, SDL_Condition;
 @@
 - SDL_strtokr
 + SDL_strtok_r
+  (...)
+@@
+@@
+- SDL_ReadLE16
++ SDL_ReadU16LE
+  (...)
+@@
+@@
+- SDL_ReadLE32
++ SDL_ReadU32LE
+  (...)
+@@
+@@
+- SDL_ReadBE32
++ SDL_ReadU32BE
+  (...)
+@@
+@@
+- SDL_ReadBE16
++ SDL_ReadU16BE
+  (...)
+@@
+@@
+- SDL_ReadLE64
++ SDL_ReadU64LE
+  (...)
+@@
+@@
+- SDL_ReadBE64
++ SDL_ReadU64BE
+  (...)
+@@
+@@
+- SDL_WriteLE16
++ SDL_WriteU16LE
+  (...)
+@@
+@@
+- SDL_WriteBE16
++ SDL_WriteU16BE
+  (...)
+@@
+@@
+- SDL_WriteLE32
++ SDL_WriteU32LE
+  (...)
+@@
+@@
+- SDL_WriteBE32
++ SDL_WriteU32BE
+  (...)
+@@
+@@
+- SDL_WriteLE64
++ SDL_WriteU64LE
+  (...)
+@@
+@@
+- SDL_WriteBE64
++ SDL_WriteU64BE
   (...)

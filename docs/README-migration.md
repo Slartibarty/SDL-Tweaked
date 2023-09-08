@@ -4,6 +4,8 @@ This guide provides useful information for migrating applications from SDL 2.0 t
 
 Details on API changes are organized by SDL 2.0 header below.
 
+The file with your main() function should include <SDL3/SDL_main.h>, as that is no longer included in SDL.h.
+
 Many functions and symbols have been renamed. We have provided a handy Python script [rename_symbols.py](https://github.com/libsdl-org/SDL/blob/main/build-scripts/rename_symbols.py) to rename SDL2 functions to their SDL3 counterparts:
 ```sh
 rename_symbols.py --all-symbols source_code_path
@@ -11,13 +13,10 @@ rename_symbols.py --all-symbols source_code_path
 
 It's also possible to apply a semantic patch to migrate more easily to SDL3: [SDL_migration.cocci](https://github.com/libsdl-org/SDL/blob/main/build-scripts/SDL_migration.cocci)
 
-
 SDL headers should now be included as `#include <SDL3/SDL.h>`. Typically that's the only header you'll need in your application unless you are using OpenGL or Vulkan functionality. We have provided a handy Python script [rename_headers.py](https://github.com/libsdl-org/SDL/blob/main/build-scripts/rename_headers.py) to rename SDL2 headers to their SDL3 counterparts:
 ```sh
 rename_headers.py source_code_path
 ```
-
-The file with your main() function should also include <SDL3/SDL_main.h>, see below in the SDL_main.h section.
 
 CMake users should use this snippet to include SDL support in their project:
 ```
@@ -39,10 +38,7 @@ LDFLAGS += $(shell pkg-config sdl3 --libs)
 
 The SDL3test library has been renamed SDL3_test.
 
-There is no SDLmain library anymore, it's now header-only, see below in the SDL_main.h section.
-
-
-begin_code.h and close_code.h in the public headers have been renamed to SDL_begin_code.h and SDL_close_code.h. These aren't meant to be included directly by applications, but if your application did, please update your `#include` lines.
+The SDLmain library has been removed, it's been entirely replaced by SDL_main.h.
 
 The vi format comments have been removed from source code. Vim users can use the [editorconfig plugin](https://github.com/editorconfig/editorconfig-vim) to automatically set tab spacing for the SDL coding style.
 
@@ -53,13 +49,128 @@ The following structures have been renamed:
 
 ## SDL_audio.h
 
+The audio subsystem in SDL3 is dramatically different than SDL2. The primary way to play audio is no longer an audio callback; instead you bind SDL_AudioStreams to devices; however, there is still a callback method available if needed.
+
+The SDL 1.2 audio compatibility API has also been removed, as it was a simplified version of the audio callback interface.
+
+SDL3 will not implicitly initialize the audio subsystem on your behalf if you open a device without doing so. Please explicitly call SDL_Init(SDL_INIT_AUDIO) at some point.
+
+SDL3's audio subsystem offers an enormous amount of power over SDL2, but if you just want a simple migration of your existing code, you can ignore most of it. The simplest migration path from SDL2 looks something like this:
+
+In SDL2, you might have done something like this to play audio...
+
+```c
+    void SDLCALL MyAudioCallback(void *userdata, Uint8 * stream, int len)
+    {
+        /* calculate a little more audio here, maybe using `userdata`, write it to `stream` */
+    }
+
+    /* ...somewhere near startup... */
+    SDL_AudioSpec my_desired_audio_format;
+    SDL_zero(my_desired_audio_format);
+    my_desired_audio_format.format = AUDIO_S16;
+    my_desired_audio_format.channels = 2;
+    my_desired_audio_format.freq = 44100;
+    my_desired_audio_format.samples = 1024;
+    my_desired_audio_format.callback = MyAudioCallback;
+    my_desired_audio_format.userdata = &my_audio_callback_user_data;
+    SDL_AudioDeviceID my_audio_device = SDL_OpenAudioDevice(NULL, 0, &my_desired_audio_format, NULL, 0);
+    SDL_PauseAudioDevice(my_audio_device, 0);
+```
+
+...in SDL3, you can do this...
+
+```c
+    void SDLCALL MyAudioCallback(SDL_AudioStream *stream, int len, void *userdata)
+    {
+        /* calculate a little more audio here, maybe using `userdata`, write it to `stream` */
+        SDL_PutAudioStreamData(stream, newdata, len);
+    }
+
+    /* ...somewhere near startup... */
+    const SDL_AudioSpec spec = { SDL_AUDIO_S16, 2, 44100 };
+    SDL_AudioStream *stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_OUTPUT, &spec, MyAudioCallback, &my_audio_callback_user_data);
+    SDL_ResumeAudioDevice(SDL_GetAudioStreamDevice(stream));
+```
+
+If you used SDL_QueueAudio instead of a callback in SDL2, this is also straightforward.
+
+```c
+    /* ...somewhere near startup... */
+    const SDL_AudioSpec spec = { SDL_AUDIO_S16, 2, 44100 };
+    SDL_AudioStream *stream = SDL_OpenAudioDeviceStream(SDL_AUDIO_DEVICE_DEFAULT_OUTPUT, &spec, NULL, NULL);
+    SDL_ResumeAudioDevice(SDL_GetAudioStreamDevice(stream));
+
+    /* ...in your main loop... */
+    /* calculate a little more audio into `buf`, add it to `stream` */
+    SDL_PutAudioStreamData(stream, buf, buflen);
+
+```
+
+...these same migration examples apply to audio capture, just using SDL_GetAudioStreamData instead of SDL_PutAudioStreamData.
+
 SDL_AudioInit() and SDL_AudioQuit() have been removed. Instead you can call SDL_InitSubSystem() and SDL_QuitSubSystem() with SDL_INIT_AUDIO, which will properly refcount the subsystems. You can choose a specific audio driver using SDL_AUDIO_DRIVER hint.
 
-SDL_PauseAudioDevice() is only used to pause audio playback. Use SDL_PlayAudioDevice() to start playing audio.
+The `SDL_AUDIO_ALLOW_*` symbols have been removed; now one may request the format they desire from the audio device, but ultimately SDL_AudioStream will manage the difference. One can use SDL_GetAudioDeviceFormat() to see what the final format is, if any "allowed" changes should be accomodated by the app.
+
+SDL_AudioDeviceID now represents both an open audio device's handle (a "logical" device) and the instance ID that the hardware owns as long as it exists on the system (a "physical" device). The separation between device instances and device indexes is gone, and logical and physical devices are almost entirely interchangeable at the API level.
+
+Devices are opened by physical device instance ID, and a new logical instance ID is generated by the open operation; This allows any device to be opened multiple times, possibly by unrelated pieces of code. SDL will manage the logical devices to provide a single stream of audio to the physical device behind the scenes.
+
+Devices are not opened by an arbitrary string name anymore, but by device instance ID (or magic numbers to request a reasonable default, like a NULL string in SDL2). In SDL2, the string was used to open both a standard list of system devices, but also allowed for arbitrary devices, such as hostnames of network sound servers. In SDL3, many of the backends that supported arbitrary device names are obsolete and have been removed; of those that remain, arbitrary devices will be opened with a default device ID and an SDL_hint, so specific end-users can set an environment variable to fit their needs and apps don't have to concern themselves with it.
+
+Many functions that would accept a device index and an `iscapture` parameter now just take an SDL_AudioDeviceID, as they are unique across all devices, instead of separate indices into output and capture device lists.
+
+Rather than iterating over audio devices using a device index, there are new functions, SDL_GetAudioOutputDevices() and SDL_GetAudioCaptureDevices(), to get the current list of devices, and new functions to get information about devices from their instance ID:
+
+```c
+{
+    if (SDL_InitSubSystem(SDL_INIT_AUDIO) == 0) {
+        int i, num_devices;
+        SDL_AudioDeviceID *devices = SDL_GetAudioOutputDevices(&num_devices);
+        if (devices) {
+            for (i = 0; i < num_devices; ++i) {
+                SDL_AudioDeviceID instance_id = devices[i];
+                char *name = SDL_GetAudioDeviceName(instance_id);
+                SDL_Log("AudioDevice %" SDL_PRIu32 ": %s\n", instance_id, name);
+                SDL_free(name);
+            }
+            SDL_free(devices);
+        }
+        SDL_QuitSubSystem(SDL_INIT_AUDIO);
+    }
+}
+```
+
+SDL_LockAudioDevice() and SDL_UnlockAudioDevice() have been removed, since there is no callback in another thread to protect. SDL's audio subsystem and SDL_AudioStream maintain their own locks internally, so audio streams are safe to use from any thread. If the app assigns a callback to a specific stream, it can use the stream's lock through SDL_LockAudioStream() if necessary.
+
+SDL_PauseAudioDevice() no longer takes a second argument; it always pauses the device. To unpause, use SDL_ResumeAudioDevice().
+
+Audio devices, opened by SDL_OpenAudioDevice(), no longer start in a paused state, as they don't begin processing audio until a stream is bound.
+
+SDL_GetAudioDeviceStatus() has been removed; there is now SDL_IsAudioDevicePaused().
+
+SDL_QueueAudio(), SDL_DequeueAudio, and SDL_ClearQueuedAudio and SDL_GetQueuedAudioSize() have been removed; an SDL_AudioStream bound to a device provides the exact same functionality.
+
+APIs that use channel counts used to use a Uint8 for the channel; now they use int.
+
+SDL_AudioSpec has been reduced; now it only holds format, channel, and sample rate. SDL_GetSilenceValueForFormat() can provide the information from the SDL_AudioSpec's `silence` field. The other SDL2 SDL_AudioSpec fields aren't relevant anymore.
+
+SDL_GetAudioDeviceSpec() is removed; use SDL_GetAudioDeviceFormat() instead.
+
+SDL_GetDefaultAudioInfo() is removed; SDL_GetAudioDeviceFormat() with SDL_AUDIO_DEVICE_DEFAULT_OUTPUT or SDL_AUDIO_DEVICE_DEFAULT_CAPTURE. There is no replacement for querying the default device name; the string is no longer used to open devices, and SDL3 will migrate between physical devices on the fly if the system default changes, so if you must show this to the user, a generic name like "System default" is recommended.
+
+SDL_MixAudio() has been removed, as it relied on legacy SDL 1.2 quirks; SDL_MixAudioFormat() remains and offers the same functionality.
+
+SDL_AudioInit() and SDL_AudioQuit() have been removed. Instead you can call SDL_InitSubSystem() and SDL_QuitSubSystem() with SDL_INIT_AUDIO, which will properly refcount the subsystems. You can choose a specific audio driver using SDL_AUDIO_DRIVER hint.
 
 SDL_FreeWAV has been removed and calls can be replaced with SDL_free.
 
-SDL_AudioCVT interface is removed, SDL_AudioStream interface or SDL_ConvertAudioSamples() helper function can be used.
+SDL_LoadWAV() is a proper function now and no longer a macro (but offers the same functionality otherwise).
+
+SDL_LoadWAV_RW() and SDL_LoadWAV() return an int now: zero on success, -1 on error, like most of SDL. They no longer return a pointer to an SDL_AudioSpec.
+
+SDL_AudioCVT interface has been removed, the SDL_AudioStream interface (for audio supplied in pieces) or the new SDL_ConvertAudioSamples() function (for converting a complete audio buffer in one call) can be used instead.
 
 Code that used to look like this:
 ```c
@@ -75,8 +186,9 @@ should be changed to:
 ```c
     Uint8 *dst_data = NULL;
     int dst_len = 0;
-    if (SDL_ConvertAudioSamples(src_format, src_channels, src_rate, src_data, src_len
-                                dst_format, dst_channels, dst_rate, &dst_data, &dst_len) < 0) {
+    const SDL_AudioSpec src_spec = { src_format, src_channels, src_rate };
+    const SDL_AudioSpec dst_spec = { dst_format, dst_channels, dst_rate };
+    if (SDL_ConvertAudioSamples(&src_spec, src_data, src_len, &dst_spec, &dst_data, &dst_len) < 0) {
         /* error */
     }
     do_something(dst_data, dst_len);
@@ -103,9 +215,13 @@ If you need to convert U16 audio data to a still-supported format at runtime, th
     }
 ```
 
-In SDL2, SDL_AudioStream would convert/resample audio data during input (via SDL_AudioStreamPut). In SDL3, it does this work when requesting audio (via SDL_GetAudioStreamData, which would have been SDL_AudioStreamPut in SDL2. The way you use an AudioStream is roughly the same, just be aware that the workload moved to a different phase.
+All remaining `AUDIO_*` symbols have been renamed to `SDL_AUDIO_*` for API consistency, but othewise are identical in value and usage.
+
+In SDL2, SDL_AudioStream would convert/resample audio data during input (via SDL_AudioStreamPut). In SDL3, it does this work when requesting audio (via SDL_GetAudioStreamData, which would have been SDL_AudioStreamGet in SDL2). The way you use an AudioStream is roughly the same, just be aware that the workload moved to a different phase.
+
 In SDL2, SDL_AudioStreamAvailable() returns 0 if passed a NULL stream. In SDL3, the equivalent SDL_GetAudioStreamAvailable() call returns -1 and sets an error string, which matches other audiostream APIs' behavior.
 
+In SDL2, SDL_AUDIODEVICEREMOVED events would fire for open devices with the `which` field set to the SDL_AudioDeviceID of the lost device, and in later SDL2 releases, would also fire this event with a `which` field of zero for unopened devices, to signify that the app might want to refresh the available device list. In SDL3, this event works the same, except it won't ever fire with a zero; in this case it'll return the physical device's SDL_AudioDeviceID. Any still-open SDL_AudioDeviceIDs generated from this device with SDL_OpenAudioDevice() will also fire a separate event.
 
 The following functions have been renamed:
 * SDL_AudioStreamAvailable() => SDL_GetAudioStreamAvailable()
@@ -118,31 +234,39 @@ The following functions have been renamed:
 
 
 The following functions have been removed:
+* SDL_GetNumAudioDevices()
+* SDL_GetAudioDeviceSpec()
 * SDL_ConvertAudio()
 * SDL_BuildAudioCVT()
 * SDL_OpenAudio()
 * SDL_CloseAudio()
 * SDL_PauseAudio()
 * SDL_GetAudioStatus()
+* SDL_GetAudioDeviceStatus()
+* SDL_GetDefaultAudioInfo()
 * SDL_LockAudio()
+* SDL_LockAudioDevice()
 * SDL_UnlockAudio()
+* SDL_UnlockAudioDevice()
 * SDL_MixAudio()
-
-Use the SDL_AudioDevice functions instead.
+* SDL_QueueAudio()
+* SDL_DequeueAudio()
+* SDL_ClearAudioQueue()
+* SDL_GetQueuedAudioSize()
 
 The following symbols have been renamed:
-* AUDIO_F32 => SDL_AUDIO_F32
-* AUDIO_F32LSB => SDL_AUDIO_F32LSB
-* AUDIO_F32MSB => SDL_AUDIO_F32MSB
-* AUDIO_F32SYS => SDL_AUDIO_F32SYS
-* AUDIO_S16 => SDL_AUDIO_S16
-* AUDIO_S16LSB => SDL_AUDIO_S16LSB
-* AUDIO_S16MSB => SDL_AUDIO_S16MSB
-* AUDIO_S16SYS => SDL_AUDIO_S16SYS
-* AUDIO_S32 => SDL_AUDIO_S32
-* AUDIO_S32LSB => SDL_AUDIO_S32LSB
-* AUDIO_S32MSB => SDL_AUDIO_S32MSB
-* AUDIO_S32SYS => SDL_AUDIO_S32SYS
+* AUDIO_F32 => SDL_AUDIO_F32LE
+* AUDIO_F32LSB => SDL_AUDIO_F32LE
+* AUDIO_F32MSB => SDL_AUDIO_F32BE
+* AUDIO_F32SYS => SDL_AUDIO_F32
+* AUDIO_S16 => SDL_AUDIO_S16LE
+* AUDIO_S16LSB => SDL_AUDIO_S16LE
+* AUDIO_S16MSB => SDL_AUDIO_S16BE
+* AUDIO_S16SYS => SDL_AUDIO_S16
+* AUDIO_S32 => SDL_AUDIO_S32LE
+* AUDIO_S32LSB => SDL_AUDIO_S32LE
+* AUDIO_S32MSB => SDL_AUDIO_S32BE
+* AUDIO_S32SYS => SDL_AUDIO_S32
 * AUDIO_S8 => SDL_AUDIO_S8
 * AUDIO_U8 => SDL_AUDIO_U8
 
@@ -380,10 +504,10 @@ The following symbols have been renamed:
 * SDL_CONTROLLER_BUTTON_LEFTSTICK => SDL_GAMEPAD_BUTTON_LEFT_STICK
 * SDL_CONTROLLER_BUTTON_MAX => SDL_GAMEPAD_BUTTON_MAX
 * SDL_CONTROLLER_BUTTON_MISC1 => SDL_GAMEPAD_BUTTON_MISC1
-* SDL_CONTROLLER_BUTTON_PADDLE1 => SDL_GAMEPAD_BUTTON_PADDLE1
-* SDL_CONTROLLER_BUTTON_PADDLE2 => SDL_GAMEPAD_BUTTON_PADDLE2
-* SDL_CONTROLLER_BUTTON_PADDLE3 => SDL_GAMEPAD_BUTTON_PADDLE3
-* SDL_CONTROLLER_BUTTON_PADDLE4 => SDL_GAMEPAD_BUTTON_PADDLE4
+* SDL_CONTROLLER_BUTTON_PADDLE1 => SDL_GAMEPAD_BUTTON_RIGHT_PADDLE1
+* SDL_CONTROLLER_BUTTON_PADDLE2 => SDL_GAMEPAD_BUTTON_LEFT_PADDLE1
+* SDL_CONTROLLER_BUTTON_PADDLE3 => SDL_GAMEPAD_BUTTON_RIGHT_PADDLE2
+* SDL_CONTROLLER_BUTTON_PADDLE4 => SDL_GAMEPAD_BUTTON_LEFT_PADDLE2
 * SDL_CONTROLLER_BUTTON_RIGHTSHOULDER => SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER
 * SDL_CONTROLLER_BUTTON_RIGHTSTICK => SDL_GAMEPAD_BUTTON_RIGHT_STICK
 * SDL_CONTROLLER_BUTTON_START => SDL_GAMEPAD_BUTTON_START
@@ -571,27 +695,6 @@ Instead SDL_main.h is now a header-only library **and not included by SDL.h anym
 Using it is really simple: Just `#include <SDL3/SDL_main.h>` in the source file with your standard
 `int main(int argc, char* argv[])` function.
 
-The rest happens automatically: If your target platform needs the SDL_main functionality,
-your main function will be renamed to SDL_main (with a macro, just like in SDL2),
-and the real main-function will be implemented by inline code from SDL_main.h - and if your target
-platform doesn't need it, nothing happens.
-Like in SDL2, if you want to handle the platform-specific main yourself instead of using the SDL_main magic,
-you can `#define SDL_MAIN_HANDLED` before `#include <SDL3/SDL_main.h>` - don't forget to call SDL_SetMainReady()
-
-If you need SDL_main.h in another source file (that doesn't implement main()), you also need to
-`#define SDL_MAIN_HANDLED` there, to avoid that multiple main functions are generated by SDL_main.h
-
-There is currently one platform where this approach doesn't always work: WinRT.
-It requires WinMain to be implemented in a C++ source file that's compiled with `/ZW`. If your main
-is implemented in plain C, or you can't use `/ZW` on that file, you can add another .cpp
-source file that just contains `#include <SDL3/SDL_main.h>` and compile that with `/ZW` - but keep
-in mind that the source file with your standard main also needs that include!
-See [README-winrt.md](./README-winrt.md) for more details.
-
-Furthermore, the different SDL_*RunApp() functions (SDL_WinRtRunApp, SDL_GDKRunApp, SDL_UIKitRunApp)
-have been unified into just `int SDL_RunApp(int argc, char* argv[], void * reserved)` (which is also
-used by additional platforms that didn't have a SDL_RunApp-like function before).
-
 ## SDL_metal.h
 
 SDL_Metal_GetDrawableSize() has been removed. SDL_GetWindowSizeInPixels() can be used in its place.
@@ -698,6 +801,8 @@ which index is the "opengl" or whatnot driver, you can just pass that string dir
 here, now. Passing NULL is the same as passing -1 here in SDL2, to signify you want SDL
 to decide for you.
 
+The SDL_RENDERER_TARGETTEXTURE flag has been removed, all current renderers support target texture functionality.
+
 When a renderer is created, it will automatically set the logical size to the size of
 the window in points. For high DPI displays, this will set up scaling from points to
 pixels. You can disable this scaling with:
@@ -780,32 +885,27 @@ size_t SDL_RWwrite(SDL_RWops *context, const void *ptr, size_t size, size_t maxn
 But now they look more like POSIX:
 
 ```c
-Sint64 SDL_RWread(SDL_RWops *context, void *ptr, Sint64 size);
-Sint64 SDL_RWwrite(SDL_RWops *context, const void *ptr, Sint64 size);
+size_t SDL_RWread(SDL_RWops *context, void *ptr, size_t size);
+size_t SDL_RWwrite(SDL_RWops *context, const void *ptr, size_t size);
 ```
-
-SDL_RWread() previously returned 0 at end of file or other error. Now it returns the number of bytes read, 0 for end of file, -1 for another error, or -2 for data not ready (in the case of a non-blocking context).
 
 Code that used to look like this:
 ```
 size_t custom_read(void *ptr, size_t size, size_t nitems, SDL_RWops *stream)
 {
-    return (size_t)SDL_RWread(stream, ptr, size, nitems);
+    return SDL_RWread(stream, ptr, size, nitems);
 }
 ```
 should be changed to:
 ```
 size_t custom_read(void *ptr, size_t size, size_t nitems, SDL_RWops *stream)
 {
-    Sint64 amount = SDL_RWread(stream, ptr, size * nitems);
-    if (amount <= 0) {
-        return 0;
+    if (size > 0 && nitems > 0) {
+        return SDL_RWread(stream, ptr, size * nitems) / size;
     }
-    return (size_t)(amount / size);
+    return 0;
 }
 ```
-
-Similarly, SDL_RWwrite() can return -2 for data not ready in the case of a non-blocking context. There is currently no way to create a non-blocking context, we have simply defined the semantic for your own custom SDL_RWops object.
 
 SDL_RWFromFP has been removed from the API, due to issues when the SDL library uses a different C runtime from the application.
 
@@ -814,23 +914,7 @@ You can implement this in your own code easily:
 #include <stdio.h>
 
 
-static Sint64 SDLCALL
-stdio_size(SDL_RWops * context)
-{
-    Sint64 pos, size;
-
-    pos = SDL_RWseek(context, 0, SDL_RW_SEEK_CUR);
-    if (pos < 0) {
-        return -1;
-    }
-    size = SDL_RWseek(context, 0, SDL_RW_SEEK_END);
-
-    SDL_RWseek(context, pos, SDL_RW_SEEK_SET);
-    return size;
-}
-
-static Sint64 SDLCALL
-stdio_seek(SDL_RWops * context, Sint64 offset, int whence)
+static Sint64 SDLCALL stdio_seek(SDL_RWops *context, Sint64 offset, int whence)
 {
     int stdiowhence;
 
@@ -858,54 +942,46 @@ stdio_seek(SDL_RWops * context, Sint64 offset, int whence)
     return SDL_Error(SDL_EFSEEK);
 }
 
-static Sint64 SDLCALL
-stdio_read(SDL_RWops * context, void *ptr, Sint64 size)
+static size_t SDLCALL stdio_read(SDL_RWops *context, void *ptr, size_t size)
 {
-    size_t nread;
+    size_t bytes;
 
-    nread = fread(ptr, 1, (size_t) size, (FILE *)context->hidden.stdio.fp);
-    if (nread == 0 && ferror((FILE *)context->hidden.stdio.fp)) {
-        return SDL_Error(SDL_EFREAD);
+    bytes = fread(ptr, 1, size, (FILE *)context->hidden.stdio.fp);
+    if (bytes == 0 && ferror((FILE *)context->hidden.stdio.fp)) {
+        SDL_Error(SDL_EFREAD);
     }
-    return (Sint64) nread;
+    return bytes;
 }
 
-static Sint64 SDLCALL
-stdio_write(SDL_RWops * context, const void *ptr, Sint64 size)
+static size_t SDLCALL stdio_write(SDL_RWops *context, const void *ptr, size_t size)
 {
-    size_t nwrote;
+    size_t bytes;
 
-    nwrote = fwrite(ptr, 1, (size_t) size, (FILE *)context->hidden.stdio.fp);
-    if (nwrote == 0 && ferror((FILE *)context->hidden.stdio.fp)) {
-        return SDL_Error(SDL_EFWRITE);
+    bytes = fwrite(ptr, 1, size, (FILE *)context->hidden.stdio.fp);
+    if (bytes == 0 && ferror((FILE *)context->hidden.stdio.fp)) {
+        SDL_Error(SDL_EFWRITE);
     }
-    return (Sint64) nwrote;
+    return bytes;
 }
 
-static int SDLCALL
-stdio_close(SDL_RWops * context)
+static int SDLCALL stdio_close(SDL_RWops *context)
 {
     int status = 0;
-    if (context) {
-        if (context->hidden.stdio.autoclose) {
-            /* WARNING:  Check the return value here! */
-            if (fclose((FILE *)context->hidden.stdio.fp) != 0) {
-                status = SDL_Error(SDL_EFWRITE);
-            }
+    if (context->hidden.stdio.autoclose) {
+        if (fclose((FILE *)context->hidden.stdio.fp) != 0) {
+            status = SDL_Error(SDL_EFWRITE);
         }
-        SDL_DestroyRW(context);
     }
+    SDL_DestroyRW(context);
     return status;
 }
 
-SDL_RWops *
-SDL_RWFromFP(void *fp, SDL_bool autoclose)
+SDL_RWops *SDL_RWFromFP(void *fp, SDL_bool autoclose)
 {
     SDL_RWops *rwops = NULL;
 
     rwops = SDL_CreateRW();
     if (rwops != NULL) {
-        rwops->size = stdio_size;
         rwops->seek = stdio_seek;
         rwops->read = stdio_read;
         rwops->write = stdio_write;
@@ -918,10 +994,23 @@ SDL_RWFromFP(void *fp, SDL_bool autoclose)
 }
 ```
 
+The functions SDL_ReadU8(), SDL_ReadU16LE(), SDL_ReadU16BE(), SDL_ReadU32LE(), SDL_ReadU32BE(), SDL_ReadU64LE(), and SDL_ReadU64BE() now return SDL_TRUE if the read succeeded and SDL_FALSE if it didn't, and store the data in a pointer passed in as a parameter.
 
 The following functions have been renamed:
 * SDL_AllocRW() => SDL_CreateRW()
 * SDL_FreeRW() => SDL_DestroyRW()
+* SDL_ReadBE16() => SDL_ReadU16BE()
+* SDL_ReadBE32() => SDL_ReadU32BE()
+* SDL_ReadBE64() => SDL_ReadU64BE()
+* SDL_ReadLE16() => SDL_ReadU16LE()
+* SDL_ReadLE32() => SDL_ReadU32LE()
+* SDL_ReadLE64() => SDL_ReadU64LE()
+* SDL_WriteBE16() => SDL_WriteU16BE()
+* SDL_WriteBE32() => SDL_WriteU32BE()
+* SDL_WriteBE64() => SDL_WriteU64BE()
+* SDL_WriteLE16() => SDL_WriteU16LE()
+* SDL_WriteLE32() => SDL_WriteU32LE()
+* SDL_WriteLE64() => SDL_WriteU64LE()
 
 ## SDL_sensor.h
 
