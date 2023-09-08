@@ -25,6 +25,11 @@
 
 #ifdef SDL_VIDEO_OPENGL_WGL
 
+// Whether to skip the GDI SwapBuffers wrapper and call straight through to wglSwapBuffers
+#if defined(__XBOXONE__) || defined(__XBOXSERIES__) || 1
+#define SKIP_GDI_SWAPBUFFERS
+#endif
+
 #if defined(__XBOXONE__) || defined(__XBOXSERIES__)
 typedef struct tagPIXELFORMATDESCRIPTOR
 {
@@ -85,8 +90,10 @@ struct SDL_GLDriverData
     BOOL (WINAPI *wglGetPixelFormatAttribivARB)(HDC hdc, int iPixelFormat, int iLayerPlane, UINT nAttributes, const int *piAttributes, int *piValues);
     BOOL (WINAPI *wglSwapIntervalEXT)(int interval);
     int (WINAPI *wglGetSwapIntervalEXT)(void);
-#if defined(__XBOXONE__) || defined(__XBOXSERIES__)
+#ifdef SKIP_GDI_SWAPBUFFERS
     BOOL (WINAPI *wglSwapBuffers)(HDC hdc);
+#endif
+#if defined(__XBOXONE__) || defined(__XBOXSERIES__)
     int (WINAPI *wglDescribePixelFormat)(HDC hdc,
                                          int iPixelFormat,
                                          UINT nBytes,

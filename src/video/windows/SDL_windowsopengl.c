@@ -98,11 +98,13 @@ typedef HGLRC(APIENTRYP PFNWGLCREATECONTEXTATTRIBSARBPROC)(HDC hDC,
 #if defined(__XBOXONE__) || defined(__XBOXSERIES__)
 #define GetDC(hwnd)          (HDC) hwnd
 #define ReleaseDC(hwnd, hdc) 1
-#define SwapBuffers          _this->gl_data->wglSwapBuffers
 #define DescribePixelFormat  _this->gl_data->wglDescribePixelFormat
 #define ChoosePixelFormat    _this->gl_data->wglChoosePixelFormat
 #define GetPixelFormat       _this->gl_data->wglGetPixelFormat
 #define SetPixelFormat       _this->gl_data->wglSetPixelFormat
+#endif
+#ifdef SKIP_GDI_SWAPBUFFERS
+#define SwapBuffers _this->gl_data->wglSwapBuffers
 #endif
 
 int WIN_GL_LoadLibrary(SDL_VideoDevice *_this, const char *path)
@@ -143,9 +145,11 @@ int WIN_GL_LoadLibrary(SDL_VideoDevice *_this, const char *path)
         SDL_LoadFunction(handle, "wglShareLists");
     /* *INDENT-ON* */ /* clang-format on */
 
-#if defined(__XBOXONE__) || defined(__XBOXSERIES__)
+#ifdef SKIP_GDI_SWAPBUFFERS
     _this->gl_data->wglSwapBuffers = (BOOL(WINAPI *)(HDC))
         SDL_LoadFunction(handle, "wglSwapBuffers");
+#endif
+#if defined(__XBOXONE__) || defined(__XBOXSERIES__)
     _this->gl_data->wglDescribePixelFormat = (int(WINAPI *)(HDC, int, UINT, LPPIXELFORMATDESCRIPTOR))
         SDL_LoadFunction(handle, "wglDescribePixelFormat");
     _this->gl_data->wglChoosePixelFormat = (int(WINAPI *)(HDC, const PIXELFORMATDESCRIPTOR *))
@@ -160,9 +164,11 @@ int WIN_GL_LoadLibrary(SDL_VideoDevice *_this, const char *path)
         !_this->gl_data->wglCreateContext ||
         !_this->gl_data->wglDeleteContext ||
         !_this->gl_data->wglMakeCurrent
+#ifdef SKIP_GDI_SWAPBUFFERS
+        || !_this->gl_data->wglSwapBuffers
+#endif
 #if defined(__XBOXONE__) || defined(__XBOXSERIES__)
-        || !_this->gl_data->wglSwapBuffers ||
-        !_this->gl_data->wglDescribePixelFormat ||
+        || !_this->gl_data->wglDescribePixelFormat ||
         !_this->gl_data->wglChoosePixelFormat ||
         !_this->gl_data->wglGetPixelFormat ||
         !_this->gl_data->wglSetPixelFormat
