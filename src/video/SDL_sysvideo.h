@@ -58,13 +58,6 @@ struct SDL_ShapeDriver
     int (*SetWindowShape)(SDL_WindowShaper *shaper, SDL_Surface *shape, SDL_WindowShapeMode *shape_mode);
 };
 
-typedef struct SDL_WindowUserData
-{
-    char *name;
-    void *data;
-    struct SDL_WindowUserData *next;
-} SDL_WindowUserData;
-
 /* Define the SDL window structure, corresponding to toplevel windows */
 struct SDL_Window
 {
@@ -111,7 +104,7 @@ struct SDL_Window
     SDL_HitTest hit_test;
     void *hit_test_data;
 
-    SDL_WindowUserData *data;
+    SDL_PropertiesID props;
 
     SDL_WindowData *driverdata;
 
@@ -153,11 +146,10 @@ struct SDL_VideoDisplay
 
     SDL_VideoDevice *device;
 
+    SDL_PropertiesID props;
+
     SDL_DisplayData *driverdata;
 };
-
-/* Forward declaration */
-struct SDL_SysWMinfo;
 
 /* Video device flags */
 typedef enum
@@ -272,9 +264,6 @@ struct SDL_VideoDevice
      */
     SDL_ShapeDriver shape_driver;
 
-    /* Get some platform dependent window information */
-    int (*GetWindowWMInfo)(SDL_VideoDevice *_this, SDL_Window *window, struct SDL_SysWMinfo *info);
-
     /* * * */
     /*
      * OpenGL support
@@ -297,8 +286,8 @@ struct SDL_VideoDevice
      */
     int (*Vulkan_LoadLibrary)(SDL_VideoDevice *_this, const char *path);
     void (*Vulkan_UnloadLibrary)(SDL_VideoDevice *_this);
-    SDL_bool (*Vulkan_GetInstanceExtensions)(SDL_VideoDevice *_this, unsigned *count, const char **names);
-    SDL_bool (*Vulkan_CreateSurface)(SDL_VideoDevice *_this, SDL_Window *window, VkInstance instance, VkSurfaceKHR *surface);
+    char const* const* (*Vulkan_GetInstanceExtensions)(SDL_VideoDevice *_this, Uint32 *count);
+    SDL_bool (*Vulkan_CreateSurface)(SDL_VideoDevice *_this, SDL_Window *window, VkInstance instance, const struct VkAllocationCallbacks *allocator, VkSurfaceKHR *surface);
 
     /* * * */
     /*
@@ -371,7 +360,6 @@ struct SDL_VideoDevice
     SDL_Window *windows;
     SDL_Window *grabbed_window;
     Uint8 window_magic;
-    SDL_WindowID next_object_id;
     Uint32 clipboard_sequence;
     SDL_ClipboardDataCallback clipboard_callback;
     SDL_ClipboardCleanupCallback clipboard_cleanup;
@@ -528,7 +516,7 @@ extern SDL_bool SDL_HasWindows(void);
 extern void SDL_RelativeToGlobalForWindow(SDL_Window *window, int rel_x, int rel_y, int *abs_x, int *abs_y);
 extern void SDL_GlobalToRelativeForWindow(SDL_Window *window, int abs_x, int abs_y, int *rel_x, int *rel_y);
 
-extern void SDL_OnDisplayConnected(SDL_VideoDisplay *display);
+extern void SDL_OnDisplayAdded(SDL_VideoDisplay *display);
 extern void SDL_OnWindowShown(SDL_Window *window);
 extern void SDL_OnWindowHidden(SDL_Window *window);
 extern void SDL_OnWindowMoved(SDL_Window *window);
@@ -544,7 +532,7 @@ extern void SDL_OnWindowFocusGained(SDL_Window *window);
 extern void SDL_OnWindowFocusLost(SDL_Window *window);
 extern void SDL_OnWindowDisplayChanged(SDL_Window *window);
 extern void SDL_UpdateWindowGrab(SDL_Window *window);
-extern SDL_Window *SDL_GetFocusWindow(void);
+extern SDL_Window *SDL_GetToplevelForKeyboardFocus(void);
 
 extern SDL_bool SDL_ShouldAllowTopmost(void);
 

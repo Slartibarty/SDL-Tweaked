@@ -44,6 +44,8 @@ typedef struct SDL_DRect
 /* The SDL 2D rendering system */
 
 typedef struct SDL_RenderDriver SDL_RenderDriver;
+extern char SDL_renderer_magic;
+extern char SDL_texture_magic;
 
 /* Rendering view state */
 typedef struct SDL_RenderViewState
@@ -65,7 +67,6 @@ struct SDL_Texture
     int access;                 /**< SDL_TextureAccess */
     int w;                      /**< The width of the texture */
     int h;                      /**< The height of the texture */
-    int modMode;                /**< The texture modulation mode */
     SDL_BlendMode blendMode;    /**< The texture blend mode */
     SDL_ScaleMode scaleMode;    /**< The texture scale mode */
     SDL_Color color;            /**< Texture modulation values */
@@ -83,8 +84,9 @@ struct SDL_Texture
 
     Uint32 last_command_generation; /* last command queue generation this texture was in. */
 
+    SDL_PropertiesID props;
+
     void *driverdata; /**< Driver specific texture representation */
-    void *userdata;
 
     SDL_Texture *prev;
     SDL_Texture *next;
@@ -269,6 +271,8 @@ struct SDL_Renderer
     void *vertex_data;
     size_t vertex_data_used;
     size_t vertex_data_allocation;
+
+    SDL_PropertiesID props;
 
     void *driverdata;
 };

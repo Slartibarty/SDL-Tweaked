@@ -1069,11 +1069,6 @@ typedef SDL_GameControllerButton, SDL_GamepadButton;
 - SDL_GameControllerButton
 + SDL_GamepadButton
 @@
-typedef SDL_GameControllerButtonBind, SDL_GamepadBinding;
-@@
-- SDL_GameControllerButtonBind
-+ SDL_GamepadBinding
-@@
 @@
 - SDL_GameControllerClose
 + SDL_CloseGamepad
@@ -1112,16 +1107,6 @@ typedef SDL_GameControllerButtonBind, SDL_GamepadBinding;
 @@
 - SDL_GameControllerGetAxisFromString
 + SDL_GetGamepadAxisFromString
-  (...)
-@@
-@@
-- SDL_GameControllerGetBindForAxis
-+ SDL_GetGamepadBindForAxis
-  (...)
-@@
-@@
-- SDL_GameControllerGetBindForButton
-+ SDL_GetGamepadBindForButton
   (...)
 @@
 @@
@@ -2750,3 +2735,18 @@ typedef SDL_cond, SDL_Condition;
 - SDL_WriteBE64
 + SDL_WriteU64BE
   (...)
+@@
+expression e, n;
+@@
+- SDL_GetWindowData(e, n)
++ SDL_GetProperty(SDL_GetWindowProperties(e), n)
+@@
+expression e, n, v;
+@@
+- SDL_SetWindowData(e, n, v)
++ SDL_SetProperty(SDL_GetWindowProperties(e), n, v, NULL, NULL)
+@@
+expression w, i, s;
+@@
+- SDL_Vulkan_CreateSurface(w, i, s)
++ SDL_Vulkan_CreateSurface(w, i, NULL, s)

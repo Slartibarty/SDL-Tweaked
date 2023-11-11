@@ -10,8 +10,6 @@
   freely.
 */
 
-#include <stdlib.h>
-
 #ifdef __EMSCRIPTEN__
 #include <emscripten/emscripten.h>
 #endif
@@ -41,17 +39,6 @@ static int system_cursor = -1;
 static SDL_Cursor *cursor = NULL;
 static SDL_bool relative_mode = SDL_FALSE;
 static const SDL_DisplayMode *highlighted_mode = NULL;
-
-/* Call this instead of exit(), so we can clean up SDL: atexit() is evil. */
-static void
-quit(int rc)
-{
-    SDLTest_CommonQuit(state);
-    /* Let 'main()' return normally */
-    if (rc != 0) {
-        exit(rc);
-    }
-}
 
 /* Draws the modes menu, and stores the mode index under the mouse in highlighted_mode */
 static void
@@ -218,7 +205,7 @@ static void loop(void)
         }
         if (event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
             SDL_Window *window = SDL_GetMouseFocus();
-            if (highlighted_mode != NULL && window != NULL) {
+            if (highlighted_mode && window) {
                 SDL_memcpy(&state->fullscreen_mode, highlighted_mode, sizeof(state->fullscreen_mode));
                 SDL_SetWindowFullscreenMode(window, highlighted_mode);
             }
@@ -228,7 +215,7 @@ static void loop(void)
     for (i = 0; i < state->num_windows; ++i) {
         SDL_Window *window = state->windows[i];
         SDL_Renderer *renderer = state->renderers[i];
-        if (window != NULL && renderer != NULL) {
+        if (window && renderer) {
             float y = 0.0f;
             SDL_Rect viewport;
             SDL_FRect menurect;
@@ -264,7 +251,7 @@ int main(int argc, char *argv[])
 
     /* Initialize test framework */
     state = SDLTest_CommonCreateState(argv, SDL_INIT_VIDEO);
-    if (state == NULL) {
+    if (!state) {
         return 1;
     }
 
@@ -277,9 +264,6 @@ int main(int argc, char *argv[])
         SDLTest_CommonQuit(state);
         return 1;
     }
-
-    SDL_SetEventEnabled(SDL_EVENT_DROP_FILE, SDL_TRUE);
-    SDL_SetEventEnabled(SDL_EVENT_DROP_TEXT, SDL_TRUE);
 
     for (i = 0; i < state->num_windows; ++i) {
         SDL_Renderer *renderer = state->renderers[i];
@@ -298,7 +282,7 @@ int main(int argc, char *argv[])
 #endif
     SDL_DestroyCursor(cursor);
 
-    quit(0);
-    /* keep the compiler happy ... */
+    SDLTest_CleanupTextDrawing();
+    SDLTest_CommonQuit(state);
     return 0;
 }

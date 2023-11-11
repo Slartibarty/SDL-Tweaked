@@ -279,7 +279,7 @@ static void keyboard_repeat_set(SDL_WaylandKeyboardRepeat *repeat_info, uint32_t
     repeat_info->next_repeat_ns = SDL_MS_TO_NS(repeat_info->repeat_delay_ms);
     repeat_info->scancode = scancode;
     if (has_text) {
-        SDL_memcpy(repeat_info->text, text, 8);
+        SDL_copyp(repeat_info->text, text);
     } else {
         repeat_info->text[0] = '\0';
     }
@@ -297,7 +297,7 @@ static uint32_t keyboard_repeat_get_key(SDL_WaylandKeyboardRepeat *repeat_info)
 static void keyboard_repeat_set_text(SDL_WaylandKeyboardRepeat *repeat_info, const char text[8])
 {
     if (repeat_info->is_initialized) {
-        SDL_memcpy(repeat_info->text, text, 8);
+        SDL_copyp(repeat_info->text, text);
     }
 }
 
@@ -360,7 +360,7 @@ int Wayland_WaitEventTimeout(SDL_VideoDevice *_this, Sint64 timeoutNS)
     WAYLAND_wl_display_flush(d->display);
 
 #ifdef SDL_USE_IME
-    if (d->text_input_manager == NULL && SDL_EventEnabled(SDL_EVENT_TEXT_INPUT)) {
+    if (!d->text_input_manager && SDL_EventEnabled(SDL_EVENT_TEXT_INPUT)) {
         SDL_IME_PumpEvents();
     }
 #endif
@@ -433,7 +433,7 @@ void Wayland_PumpEvents(SDL_VideoDevice *_this)
     int err;
 
 #ifdef SDL_USE_IME
-    if (d->text_input_manager == NULL && SDL_EventEnabled(SDL_EVENT_TEXT_INPUT)) {
+    if (!d->text_input_manager && SDL_EventEnabled(SDL_EVENT_TEXT_INPUT)) {
         SDL_IME_PumpEvents();
     }
 #endif
@@ -507,7 +507,7 @@ static void pointer_handle_enter(void *data, struct wl_pointer *pointer,
     struct SDL_WaylandInput *input = data;
     SDL_WindowData *window;
 
-    if (surface == NULL) {
+    if (!surface) {
         /* enter event for a window we've just destroyed */
         return;
     }
@@ -549,7 +549,7 @@ static void pointer_handle_leave(void *data, struct wl_pointer *pointer,
 {
     struct SDL_WaylandInput *input = data;
 
-    if (surface == NULL || !SDL_WAYLAND_own_surface(surface)) {
+    if (!surface || !SDL_WAYLAND_own_surface(surface)) {
         return;
     }
 
@@ -823,7 +823,7 @@ static void pointer_handle_axis(void *data, struct wl_pointer *pointer,
 {
     struct SDL_WaylandInput *input = data;
 
-    if (wl_seat_get_version(input->seat) >= 5) {
+    if (wl_seat_get_version(input->seat) >= WL_POINTER_FRAME_SINCE_VERSION) {
         input->pointer_curr_axis_info.timestamp_ns = Wayland_GetPointerTimestamp(input, time);
         pointer_handle_axis_common(input, AXIS_EVENT_CONTINUOUS, axis, value);
     } else {
@@ -953,8 +953,18 @@ static void touch_handler_down(void *data, struct wl_touch *touch, uint32_t seri
     window_data = (SDL_WindowData *)wl_surface_get_user_data(surface);
 
     if (window_data) {
-        const float x = wl_fixed_to_double(fx) / window_data->wl_window_width;
-        const float y = wl_fixed_to_double(fy) / window_data->wl_window_height;
+        float x, y;
+
+        if (window_data->wl_window_width <= 1) {
+            x = 0.5f;
+        } else {
+            x = wl_fixed_to_double(fx) / (window_data->wl_window_width - 1);
+        }
+        if (window_data->wl_window_height <= 1) {
+            y = 0.5f;
+        } else {
+            y = wl_fixed_to_double(fy) / (window_data->wl_window_height - 1);
+        }
 
         SDL_SendTouch(Wayland_GetTouchTimestamp(input, timestamp), (SDL_TouchID)(intptr_t)touch,
                       (SDL_FingerID)id, window_data->sdlwindow, SDL_TRUE, x, y, 1.0f);
@@ -1087,7 +1097,7 @@ static void keyboard_handle_keymap(void *data, struct wl_keyboard *keyboard,
     char *map_str;
     const char *locale;
 
-    if (data == NULL) {
+    if (!data) {
         close(fd);
         return;
     }
@@ -1160,11 +1170,11 @@ static void keyboard_handle_keymap(void *data, struct wl_keyboard *keyboard,
 
     /* Look up the preferred locale, falling back to "C" as default */
     locale = SDL_getenv("LC_ALL");
-    if (locale == NULL) {
+    if (!locale) {
         locale = SDL_getenv("LC_CTYPE");
-        if (locale == NULL) {
+        if (!locale) {
             locale = SDL_getenv("LANG");
-            if (locale == NULL) {
+            if (!locale) {
                 locale = "C";
             }
         }
@@ -1368,7 +1378,7 @@ static void keyboard_handle_enter(void *data, struct wl_keyboard *keyboard,
     SDL_WindowData *window;
     uint32_t *key;
 
-    if (surface == NULL) {
+    if (!surface) {
         /* enter event for a window we've just destroyed */
         return;
     }
@@ -1421,7 +1431,7 @@ static void keyboard_handle_leave(void *data, struct wl_keyboard *keyboard,
     struct SDL_WaylandInput *input = data;
     SDL_WindowData *window;
 
-    if (surface == NULL || !SDL_WAYLAND_own_surface(surface)) {
+    if (!surface || !SDL_WAYLAND_own_surface(surface)) {
         return;
     }
 
@@ -1452,7 +1462,7 @@ static SDL_bool keyboard_input_get_text(char text[8], const struct SDL_WaylandIn
     const xkb_keysym_t *syms;
     xkb_keysym_t sym;
 
-    if (window == NULL || window->keyboard_device != input || !input->xkb.state) {
+    if (!window || window->keyboard_device != input || !input->xkb.state) {
         return SDL_FALSE;
     }
 
@@ -1672,7 +1682,7 @@ static void data_source_handle_send(void *data, struct wl_data_source *wl_data_s
 static void data_source_handle_cancelled(void *data, struct wl_data_source *wl_data_source)
 {
     SDL_WaylandDataSource *source = data;
-    if (source != NULL) {
+    if (source) {
         Wayland_data_source_destroy(source);
     }
 }
@@ -1722,21 +1732,21 @@ SDL_WaylandDataSource *Wayland_data_source_create(SDL_VideoDevice *_this)
     SDL_VideoData *driver_data = NULL;
     struct wl_data_source *id = NULL;
 
-    if (_this == NULL || _this->driverdata == NULL) {
+    if (!_this || !_this->driverdata) {
         SDL_SetError("Video driver uninitialized");
     } else {
         driver_data = _this->driverdata;
 
-        if (driver_data->data_device_manager != NULL) {
+        if (driver_data->data_device_manager) {
             id = wl_data_device_manager_create_data_source(
                 driver_data->data_device_manager);
         }
 
-        if (id == NULL) {
+        if (!id) {
             SDL_SetError("Wayland unable to create data source");
         } else {
             data_source = SDL_calloc(1, sizeof(*data_source));
-            if (data_source == NULL) {
+            if (!data_source) {
                 SDL_OutOfMemory();
                 wl_data_source_destroy(id);
             } else {
@@ -1756,21 +1766,21 @@ SDL_WaylandPrimarySelectionSource *Wayland_primary_selection_source_create(SDL_V
     SDL_VideoData *driver_data = NULL;
     struct zwp_primary_selection_source_v1 *id = NULL;
 
-    if (_this == NULL || _this->driverdata == NULL) {
+    if (!_this || !_this->driverdata) {
         SDL_SetError("Video driver uninitialized");
     } else {
         driver_data = _this->driverdata;
 
-        if (driver_data->primary_selection_device_manager != NULL) {
+        if (driver_data->primary_selection_device_manager) {
             id = zwp_primary_selection_device_manager_v1_create_source(
                 driver_data->primary_selection_device_manager);
         }
 
-        if (id == NULL) {
+        if (!id) {
             SDL_SetError("Wayland unable to create primary selection source");
         } else {
             primary_selection_source = SDL_calloc(1, sizeof(*primary_selection_source));
-            if (primary_selection_source == NULL) {
+            if (!primary_selection_source) {
                 SDL_OutOfMemory();
                 zwp_primary_selection_source_v1_destroy(id);
             } else {
@@ -1823,7 +1833,7 @@ static void data_device_handle_data_offer(void *data, struct wl_data_device *wl_
     SDL_WaylandDataOffer *data_offer = NULL;
 
     data_offer = SDL_calloc(1, sizeof(*data_offer));
-    if (data_offer == NULL) {
+    if (!data_offer) {
         SDL_OutOfMemory();
     } else {
         data_offer->offer = id;
@@ -1844,32 +1854,44 @@ static void data_device_handle_enter(void *data, struct wl_data_device *wl_data_
 
     data_device->drag_serial = serial;
 
-    if (id != NULL) {
+    if (id) {
         data_device->drag_offer = wl_data_offer_get_user_data(id);
 
         /* TODO: SDL Support more mime types */
-        has_mime = Wayland_data_offer_has_mime(
-            data_device->drag_offer, FILE_MIME);
-
-        /* If drag_mime is NULL this will decline the offer */
-        wl_data_offer_accept(id, serial,
-                             (has_mime == SDL_TRUE) ? FILE_MIME : NULL);
+#ifdef SDL_USE_LIBDBUS
+        if (Wayland_data_offer_has_mime(data_device->drag_offer, FILE_PORTAL_MIME)) {
+            has_mime = SDL_TRUE;
+            wl_data_offer_accept(id, serial, FILE_PORTAL_MIME);
+        }
+#endif
+        if (Wayland_data_offer_has_mime(data_device->drag_offer, FILE_MIME)) {
+            has_mime = SDL_TRUE;
+            wl_data_offer_accept(id, serial, FILE_MIME);
+        }
 
         /* SDL only supports "copy" style drag and drop */
-        if (has_mime == SDL_TRUE) {
+        if (has_mime) {
             dnd_action = WL_DATA_DEVICE_MANAGER_DND_ACTION_COPY;
+        } else {
+            /* drag_mime is NULL this will decline the offer */
+            wl_data_offer_accept(id, serial, NULL);
         }
-        if (wl_data_offer_get_version(data_device->drag_offer->offer) >= 3) {
+        if (wl_data_offer_get_version(data_device->drag_offer->offer) >=
+            WL_DATA_OFFER_SET_ACTIONS_SINCE_VERSION) {
             wl_data_offer_set_actions(data_device->drag_offer->offer,
                                       dnd_action, dnd_action);
         }
 
         /* find the current window */
-        if (surface && SDL_WAYLAND_own_surface(surface)) {
-           SDL_WindowData *window = (SDL_WindowData *)wl_surface_get_user_data(surface);
-           if (window) {
-              data_device->dnd_window = window->sdlwindow;
-           }
+        if (surface) {
+            if (SDL_WAYLAND_own_surface(surface)) {
+                SDL_WindowData *window = (SDL_WindowData *)wl_surface_get_user_data(surface);
+                if (window) {
+                    data_device->dnd_window = window->sdlwindow;
+                }
+            } else {
+                data_device->dnd_window = NULL;
+            }
         }
     }
 }
@@ -1878,7 +1900,7 @@ static void data_device_handle_leave(void *data, struct wl_data_device *wl_data_
 {
     SDL_WaylandDataDevice *data_device = data;
 
-    if (data_device->drag_offer != NULL) {
+    if (data_device->drag_offer) {
         Wayland_data_offer_destroy(data_device->drag_offer);
         data_device->drag_offer = NULL;
     }
@@ -1889,27 +1911,15 @@ static void data_device_handle_motion(void *data, struct wl_data_device *wl_data
 {
     SDL_WaylandDataDevice *data_device = data;
 
-    if (data_device->drag_offer != NULL) {
-        /* TODO: SDL Support more mime types */
-        size_t length;
-        void *buffer = Wayland_data_offer_receive(data_device->drag_offer,
-                                                  FILE_MIME, &length);
-        if (buffer) {
-            char *saveptr = NULL;
-            char *token = SDL_strtok_r((char *)buffer, "\r\n", &saveptr);
-            while (token != NULL) {
-                char *fn = Wayland_URIToLocal(token);
-                if (fn) {
-                    double dx;
-                    double dy;
-                    dx = wl_fixed_to_double(x);
-                    dy = wl_fixed_to_double(y);
-                    SDL_SendDropPosition(data_device->dnd_window, fn, (float)dx, (float)dy);
-                }
-                token = SDL_strtok_r(NULL, "\r\n", &saveptr);
-            }
-            SDL_free(buffer);
-        }
+    if (data_device->drag_offer && data_device->dnd_window) {
+        const float dx = (float)wl_fixed_to_double(x);
+        const float dy = (float)wl_fixed_to_double(y);
+
+        /* XXX: Send the filename here if the event system ever starts passing it though.
+         *      Any future implementation should cache the filenames, as otherwise this could
+         *      hammer the DBus interface hundreds or even thousands of times per second.
+         */
+        SDL_SendDropPosition(data_device->dnd_window, dx, dy);
     }
 }
 
@@ -1932,7 +1942,7 @@ static int Wayland_URIDecode(char *buf, int len)
 {
     int ri, wi, di;
     char decode = '\0';
-    if (buf == NULL || len < 0) {
+    if (!buf || len < 0) {
         errno = EINVAL;
         return -1;
     }
@@ -2010,7 +2020,7 @@ static char *Wayland_URIToLocal(char *uri)
     /* got a hostname? */
     if (!local && uri[0] == '/' && uri[2] != '/') {
         char *hostname_end = SDL_strchr(uri + 1, '/');
-        if (hostname_end != NULL) {
+        if (hostname_end) {
             char hostname[257];
             if (gethostname(hostname, 255) == 0) {
                 hostname[256] = '\0';
@@ -2038,25 +2048,66 @@ static void data_device_handle_drop(void *data, struct wl_data_device *wl_data_d
 {
     SDL_WaylandDataDevice *data_device = data;
 
-    if (data_device->drag_offer != NULL) {
+    if (data_device->drag_offer && data_device->dnd_window) {
         /* TODO: SDL Support more mime types */
         size_t length;
-        void *buffer = Wayland_data_offer_receive(data_device->drag_offer,
-                                                  FILE_MIME, &length);
-        if (buffer) {
-            char *saveptr = NULL;
-            char *token = SDL_strtok_r((char *)buffer, "\r\n", &saveptr);
-            while (token != NULL) {
-                char *fn = Wayland_URIToLocal(token);
-                if (fn) {
-                    SDL_SendDropFile(data_device->dnd_window, fn);
+        SDL_bool drop_handled = SDL_FALSE;
+#ifdef SDL_USE_LIBDBUS
+        if (Wayland_data_offer_has_mime(
+            data_device->drag_offer, FILE_PORTAL_MIME)) {
+            void *buffer = Wayland_data_offer_receive(data_device->drag_offer,
+                                                      FILE_PORTAL_MIME, &length);
+            if (buffer) {
+                SDL_DBusContext *dbus = SDL_DBus_GetContext();
+                if (dbus) {
+                    int path_count = 0;
+                    char **paths = SDL_DBus_DocumentsPortalRetrieveFiles(buffer, &path_count);
+                    /* If dropped files contain a directory the list is empty */
+                    if (paths && path_count > 0) {
+                        for (int i = 0; i < path_count; i++) {
+                            SDL_SendDropFile(data_device->dnd_window, NULL, paths[i]);
+                        }
+                        dbus->free_string_array(paths);
+                        SDL_SendDropComplete(data_device->dnd_window);
+                        drop_handled = SDL_TRUE;
+                    }
                 }
-                token = SDL_strtok_r(NULL, "\r\n", &saveptr);
+                SDL_free(buffer);
             }
-            SDL_SendDropComplete(data_device->dnd_window);
-            SDL_free(buffer);
+        }
+#endif
+        /* If XDG document portal fails fallback.
+         * When running a flatpak sandbox this will most likely be a list of
+         * non paths that are not visible to the application
+         */
+        if (!drop_handled && Wayland_data_offer_has_mime(
+                                                         data_device->drag_offer, FILE_MIME)) {
+            void *buffer = Wayland_data_offer_receive(data_device->drag_offer,
+                                                      FILE_MIME, &length);
+            if (buffer) {
+                char *saveptr = NULL;
+                char *token = SDL_strtok_r((char *)buffer, "\r\n", &saveptr);
+                while (token) {
+                    char *fn = Wayland_URIToLocal(token);
+                    if (fn) {
+                        SDL_SendDropFile(data_device->dnd_window, NULL, fn);
+                    }
+                    token = SDL_strtok_r(NULL, "\r\n", &saveptr);
+                }
+                SDL_SendDropComplete(data_device->dnd_window);
+                SDL_free(buffer);
+                drop_handled = SDL_TRUE;
+            }
+        }
+
+        if (drop_handled && wl_data_offer_get_version(data_device->drag_offer->offer) >=
+            WL_DATA_OFFER_FINISH_SINCE_VERSION) {
+            wl_data_offer_finish(data_device->drag_offer->offer);
         }
     }
+
+    Wayland_data_offer_destroy(data_device->drag_offer);
+    data_device->drag_offer = NULL;
 }
 
 static void data_device_handle_selection(void *data, struct wl_data_device *wl_data_device,
@@ -2065,7 +2116,7 @@ static void data_device_handle_selection(void *data, struct wl_data_device *wl_d
     SDL_WaylandDataDevice *data_device = data;
     SDL_WaylandDataOffer *offer = NULL;
 
-    if (id != NULL) {
+    if (id) {
         offer = wl_data_offer_get_user_data(id);
     }
 
@@ -2092,7 +2143,7 @@ static void primary_selection_device_handle_offer(void *data, struct zwp_primary
     SDL_WaylandPrimarySelectionOffer *primary_selection_offer = NULL;
 
     primary_selection_offer = SDL_calloc(1, sizeof(*primary_selection_offer));
-    if (primary_selection_offer == NULL) {
+    if (!primary_selection_offer) {
         SDL_OutOfMemory();
     } else {
         primary_selection_offer->offer = id;
@@ -2109,7 +2160,7 @@ static void primary_selection_device_handle_selection(void *data, struct zwp_pri
     SDL_WaylandPrimarySelectionDevice *primary_selection_device = data;
     SDL_WaylandPrimarySelectionOffer *offer = NULL;
 
-    if (id != NULL) {
+    if (id) {
         offer = zwp_primary_selection_offer_v1_get_user_data(id);
     }
 
@@ -2150,33 +2201,19 @@ static void text_input_preedit_string(void *data,
     char buf[SDL_TEXTEDITINGEVENT_TEXT_SIZE];
     text_input->has_preedit = SDL_TRUE;
     if (text) {
-        if (SDL_GetHintBoolean(SDL_HINT_IME_SUPPORT_EXTENDED_TEXT, SDL_FALSE)) {
-            int cursor_begin_utf8 = cursor_begin >= 0 ? (int)SDL_utf8strnlen(text, cursor_begin) : -1;
-            int cursor_end_utf8 = cursor_end >= 0 ? (int)SDL_utf8strnlen(text, cursor_end) : -1;
-            int cursor_size_utf8;
-            if (cursor_end_utf8 >= 0) {
-                if (cursor_begin_utf8 >= 0) {
-                    cursor_size_utf8 = cursor_end_utf8 - cursor_begin_utf8;
-                } else {
-                    cursor_size_utf8 = cursor_end_utf8;
-                }
+        int cursor_begin_utf8 = cursor_begin >= 0 ? (int)SDL_utf8strnlen(text, cursor_begin) : -1;
+        int cursor_end_utf8 = cursor_end >= 0 ? (int)SDL_utf8strnlen(text, cursor_end) : -1;
+        int cursor_size_utf8;
+        if (cursor_end_utf8 >= 0) {
+            if (cursor_begin_utf8 >= 0) {
+                cursor_size_utf8 = cursor_end_utf8 - cursor_begin_utf8;
             } else {
-                cursor_size_utf8 = -1;
+                cursor_size_utf8 = cursor_end_utf8;
             }
-            SDL_SendEditingText(text, cursor_begin_utf8, cursor_size_utf8);
         } else {
-            int text_bytes = (int)SDL_strlen(text), i = 0;
-            int cursor = 0;
-            do {
-                const int sz = (int)SDL_utf8strlcpy(buf, text + i, sizeof(buf));
-                const int chars = (int)SDL_utf8strlen(buf);
-
-                SDL_SendEditingText(buf, cursor, chars);
-
-                i += sz;
-                cursor += chars;
-            } while (i < text_bytes);
+            cursor_size_utf8 = -1;
         }
+        SDL_SendEditingText(text, cursor_begin_utf8, cursor_size_utf8);
     } else {
         buf[0] = '\0';
         SDL_SendEditingText(buf, 0, 0);
@@ -2233,7 +2270,7 @@ static void Wayland_create_data_device(SDL_VideoData *d)
     SDL_WaylandDataDevice *data_device = NULL;
 
     data_device = SDL_calloc(1, sizeof(*data_device));
-    if (data_device == NULL) {
+    if (!data_device) {
         return;
     }
 
@@ -2241,7 +2278,7 @@ static void Wayland_create_data_device(SDL_VideoData *d)
         d->data_device_manager, d->input->seat);
     data_device->video_data = d;
 
-    if (data_device->data_device == NULL) {
+    if (!data_device->data_device) {
         SDL_free(data_device);
     } else {
         wl_data_device_set_user_data(data_device->data_device, data_device);
@@ -2256,7 +2293,7 @@ static void Wayland_create_primary_selection_device(SDL_VideoData *d)
     SDL_WaylandPrimarySelectionDevice *primary_selection_device = NULL;
 
     primary_selection_device = SDL_calloc(1, sizeof(*primary_selection_device));
-    if (primary_selection_device == NULL) {
+    if (!primary_selection_device) {
         return;
     }
 
@@ -2264,7 +2301,7 @@ static void Wayland_create_primary_selection_device(SDL_VideoData *d)
         d->primary_selection_device_manager, d->input->seat);
     primary_selection_device->video_data = d;
 
-    if (primary_selection_device->primary_selection_device == NULL) {
+    if (!primary_selection_device->primary_selection_device) {
         SDL_free(primary_selection_device);
     } else {
         zwp_primary_selection_device_v1_set_user_data(primary_selection_device->primary_selection_device,
@@ -2280,14 +2317,14 @@ static void Wayland_create_text_input(SDL_VideoData *d)
     SDL_WaylandTextInput *text_input = NULL;
 
     text_input = SDL_calloc(1, sizeof(*text_input));
-    if (text_input == NULL) {
+    if (!text_input) {
         return;
     }
 
     text_input->text_input = zwp_text_input_manager_v3_get_text_input(
         d->text_input_manager, d->input->seat);
 
-    if (text_input->text_input == NULL) {
+    if (!text_input->text_input) {
         SDL_free(text_input);
     } else {
         zwp_text_input_v3_set_user_data(text_input->text_input, text_input);
@@ -2301,7 +2338,7 @@ void Wayland_add_data_device_manager(SDL_VideoData *d, uint32_t id, uint32_t ver
 {
     d->data_device_manager = wl_registry_bind(d->registry, id, &wl_data_device_manager_interface, SDL_min(3, version));
 
-    if (d->input != NULL) {
+    if (d->input) {
         Wayland_create_data_device(d);
     }
 }
@@ -2310,7 +2347,7 @@ void Wayland_add_primary_selection_device_manager(SDL_VideoData *d, uint32_t id,
 {
     d->primary_selection_device_manager = wl_registry_bind(d->registry, id, &zwp_primary_selection_device_manager_v1_interface, 1);
 
-    if (d->input != NULL) {
+    if (d->input) {
         Wayland_create_primary_selection_device(d);
     }
 }
@@ -2319,7 +2356,7 @@ void Wayland_add_text_input_manager(SDL_VideoData *d, uint32_t id, uint32_t vers
 {
     d->text_input_manager = wl_registry_bind(d->registry, id, &zwp_text_input_manager_v3_interface, 1);
 
-    if (d->input != NULL) {
+    if (d->input) {
         Wayland_create_text_input(d);
     }
 }
@@ -2359,7 +2396,7 @@ static void tablet_tool_handle_proximity_in(void *data, struct zwp_tablet_tool_v
     struct SDL_WaylandTabletInput *input = data;
     SDL_WindowData *window;
 
-    if (surface == NULL) {
+    if (!surface) {
         return;
     }
 
@@ -2417,7 +2454,7 @@ static void tablet_tool_handle_down(void *data, struct zwp_tablet_tool_v2 *tool,
     SDL_WindowData *window = input->tool_focus;
     input->is_down = SDL_TRUE;
     Wayland_UpdateImplicitGrabSerial(input->sdlWaylandInput, serial);
-    if (window == NULL) {
+    if (!window) {
         /* tablet_tool_handle_proximity_out gets called when moving over the libdecoration csd.
          * that sets input->tool_focus (window) to NULL, but handle_{down,up} events are still
          * received. To prevent SIGSEGV this returns when this is the case.
@@ -2435,7 +2472,7 @@ static void tablet_tool_handle_up(void *data, struct zwp_tablet_tool_v2 *tool)
 
     input->is_down = SDL_FALSE;
 
-    if (window == NULL) {
+    if (!window) {
         /* tablet_tool_handle_proximity_out gets called when moving over the libdecoration csd.
          * that sets input->tool_focus (window) to NULL, but handle_{down,up} events are still
          * received. To prevent SIGSEGV this returns when this is the case.
@@ -2489,13 +2526,13 @@ static void tablet_tool_handle_button(void *data, struct zwp_tablet_tool_v2 *too
     switch (button) {
     /* see %{_includedir}/linux/input-event-codes.h */
     case 0x14b: /* BTN_STYLUS */
-        input->btn_stylus = state == ZWP_TABLET_PAD_V2_BUTTON_STATE_PRESSED ? SDL_TRUE : SDL_FALSE;
+        input->btn_stylus = (state == ZWP_TABLET_PAD_V2_BUTTON_STATE_PRESSED);
         break;
     case 0x14c: /* BTN_STYLUS2 */
-        input->btn_stylus2 = state == ZWP_TABLET_PAD_V2_BUTTON_STATE_PRESSED ? SDL_TRUE : SDL_FALSE;
+        input->btn_stylus2 = (state == ZWP_TABLET_PAD_V2_BUTTON_STATE_PRESSED);
         break;
     case 0x149: /* BTN_STYLUS3 */
-        input->btn_stylus3 = state == ZWP_TABLET_PAD_V2_BUTTON_STATE_PRESSED ? SDL_TRUE : SDL_FALSE;
+        input->btn_stylus3 = (state == ZWP_TABLET_PAD_V2_BUTTON_STATE_PRESSED);
         break;
     }
 
@@ -2551,7 +2588,7 @@ static struct SDL_WaylandTabletObjectListNode *tablet_object_list_new_node(void 
     struct SDL_WaylandTabletObjectListNode *node;
 
     node = SDL_calloc(1, sizeof(*node));
-    if (node == NULL) {
+    if (!node) {
         return NULL;
     }
 
@@ -2563,7 +2600,7 @@ static struct SDL_WaylandTabletObjectListNode *tablet_object_list_new_node(void 
 
 static void tablet_object_list_append(struct SDL_WaylandTabletObjectListNode *head, void *object)
 {
-    if (head->object == NULL) {
+    if (!head->object) {
         head->object = object;
         return;
     }
@@ -2621,12 +2658,12 @@ void Wayland_input_add_tablet(struct SDL_WaylandInput *input, struct SDL_Wayland
 {
     struct SDL_WaylandTabletInput *tablet_input;
 
-    if (tablet_manager == NULL || input == NULL || !input->seat) {
+    if (!tablet_manager || !input || !input->seat) {
         return;
     }
 
     tablet_input = SDL_calloc(1, sizeof(*tablet_input));
-    if (tablet_input == NULL) {
+    if (!tablet_input) {
         return;
     }
 
@@ -2660,7 +2697,7 @@ void Wayland_display_add_input(SDL_VideoData *d, uint32_t id, uint32_t version)
     struct SDL_WaylandInput *input;
 
     input = SDL_calloc(1, sizeof(*input));
-    if (input == NULL) {
+    if (!input) {
         return;
     }
 
@@ -2671,13 +2708,13 @@ void Wayland_display_add_input(SDL_VideoData *d, uint32_t id, uint32_t version)
     input->xkb.current_group = XKB_GROUP_INVALID;
     d->input = input;
 
-    if (d->data_device_manager != NULL) {
+    if (d->data_device_manager) {
         Wayland_create_data_device(d);
     }
-    if (d->primary_selection_device_manager != NULL) {
+    if (d->primary_selection_device_manager) {
         Wayland_create_primary_selection_device(d);
     }
-    if (d->text_input_manager != NULL) {
+    if (d->text_input_manager) {
         Wayland_create_text_input(d);
     }
 
@@ -2695,7 +2732,7 @@ void Wayland_display_destroy_input(SDL_VideoData *d)
 {
     struct SDL_WaylandInput *input = d->input;
 
-    if (input == NULL) {
+    if (!input) {
         return;
     }
 
@@ -2709,34 +2746,38 @@ void Wayland_display_destroy_input(SDL_VideoData *d)
         zwp_input_timestamps_v1_destroy(input->touch_timestamps);
     }
 
-    if (input->data_device != NULL) {
+    if (input->data_device) {
         Wayland_data_device_clear_selection(input->data_device);
-        if (input->data_device->selection_offer != NULL) {
+        if (input->data_device->selection_offer) {
             Wayland_data_offer_destroy(input->data_device->selection_offer);
         }
-        if (input->data_device->drag_offer != NULL) {
+        if (input->data_device->drag_offer) {
             Wayland_data_offer_destroy(input->data_device->drag_offer);
         }
-        if (input->data_device->data_device != NULL) {
-            wl_data_device_release(input->data_device->data_device);
+        if (input->data_device->data_device) {
+            if (wl_data_device_get_version(input->data_device->data_device) >= WL_DATA_DEVICE_RELEASE_SINCE_VERSION) {
+                wl_data_device_release(input->data_device->data_device);
+            } else {
+                wl_data_device_destroy(input->data_device->data_device);
+            }
         }
         SDL_free(input->data_device);
     }
 
-    if (input->primary_selection_device != NULL) {
-        if (input->primary_selection_device->selection_offer != NULL) {
+    if (input->primary_selection_device) {
+        if (input->primary_selection_device->selection_offer) {
             Wayland_primary_selection_offer_destroy(input->primary_selection_device->selection_offer);
         }
-        if (input->primary_selection_device->selection_source != NULL) {
+        if (input->primary_selection_device->selection_source) {
             Wayland_primary_selection_source_destroy(input->primary_selection_device->selection_source);
         }
-        if (input->primary_selection_device->primary_selection_device != NULL) {
+        if (input->primary_selection_device->primary_selection_device) {
             zwp_primary_selection_device_v1_destroy(input->primary_selection_device->primary_selection_device);
         }
         SDL_free(input->primary_selection_device);
     }
 
-    if (input->text_input != NULL) {
+    if (input->text_input) {
         zwp_text_input_v3_destroy(input->text_input->text_input);
         SDL_free(input->text_input);
     }
@@ -2805,35 +2846,6 @@ void Wayland_display_destroy_input(SDL_VideoData *d)
     d->input = NULL;
 }
 
-/* !!! FIXME: just merge these into display_handle_global(). */
-void Wayland_display_add_relative_pointer_manager(SDL_VideoData *d, uint32_t id)
-{
-    d->relative_pointer_manager =
-        wl_registry_bind(d->registry, id,
-                         &zwp_relative_pointer_manager_v1_interface, 1);
-}
-
-void Wayland_display_destroy_relative_pointer_manager(SDL_VideoData *d)
-{
-    if (d->relative_pointer_manager) {
-        zwp_relative_pointer_manager_v1_destroy(d->relative_pointer_manager);
-    }
-}
-
-void Wayland_display_add_pointer_constraints(SDL_VideoData *d, uint32_t id)
-{
-    d->pointer_constraints =
-        wl_registry_bind(d->registry, id,
-                         &zwp_pointer_constraints_v1_interface, 1);
-}
-
-void Wayland_display_destroy_pointer_constraints(SDL_VideoData *d)
-{
-    if (d->pointer_constraints) {
-        zwp_pointer_constraints_v1_destroy(d->pointer_constraints);
-    }
-}
-
 static void relative_pointer_handle_relative_motion(void *data,
                                                     struct zwp_relative_pointer_v1 *pointer,
                                                     uint32_t time_hi,
@@ -2885,6 +2897,10 @@ static void lock_pointer_to_window(SDL_Window *window,
     SDL_WindowData *w = window->driverdata;
     SDL_VideoData *d = input->display;
     struct zwp_locked_pointer_v1 *locked_pointer;
+
+    if (!d->pointer_constraints || !input->pointer) {
+        return;
+    }
 
     if (w->locked_pointer) {
         return;
@@ -2973,8 +2989,10 @@ int Wayland_input_unlock_pointer(struct SDL_WaylandInput *input)
         w->locked_pointer = NULL;
     }
 
-    zwp_relative_pointer_v1_destroy(input->relative_pointer);
-    input->relative_pointer = NULL;
+    if (input->relative_pointer) {
+        zwp_relative_pointer_v1_destroy(input->relative_pointer);
+        input->relative_pointer = NULL;
+    }
 
     d->relative_mouse_mode = 0;
 
@@ -3060,7 +3078,7 @@ int Wayland_input_confine_pointer(struct SDL_WaylandInput *input, SDL_Window *wi
                                          &confined_pointer_listener,
                                          window);
 
-    if (confine_rect != NULL) {
+    if (confine_rect) {
         wl_region_destroy(confine_rect);
     }
 

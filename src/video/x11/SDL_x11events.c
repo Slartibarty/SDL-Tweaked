@@ -40,8 +40,6 @@
 #include "../../core/linux/SDL_system_theme.h"
 #include "../../SDL_utils_c.h"
 
-#include <SDL3/SDL_syswm.h>
-
 #include <stdio.h>
 
 /*#define DEBUG_XEVENTS*/
@@ -102,7 +100,7 @@ static void X11_ReadProperty(SDL_x11Prop *p, Display *disp, Window w, Atom prop)
     int bytes_fetch = 0;
 
     do {
-        if (ret != NULL) {
+        if (ret) {
             X11_XFree(ret);
         }
         X11_XGetWindowProperty(disp, w, prop, 0, bytes_fetch, False, AnyPropertyType, &type, &fmt, &count, &bytes_left, &ret);
@@ -224,7 +222,7 @@ static int X11_URIDecode(char *buf, int len)
 {
     int ri, wi, di;
     char decode = '\0';
-    if (buf == NULL || len < 0) {
+    if (!buf || len < 0) {
         errno = EINVAL;
         return -1;
     }
@@ -300,7 +298,7 @@ static char *X11_URIToLocal(char *uri)
     /* got a hostname? */
     if (!local && uri[0] == '/' && uri[2] != '/') {
         char *hostname_end = SDL_strchr(uri + 1, '/');
-        if (hostname_end != NULL) {
+        if (hostname_end) {
             char hostname[257];
             if (gethostname(hostname, 255) == 0) {
                 hostname[256] = '\0';
@@ -324,27 +322,25 @@ static char *X11_URIToLocal(char *uri)
     return file;
 }
 
+/* An X11 event hook */
+static SDL_X11EventHook g_X11EventHook = NULL;
+static void *g_X11EventHookData = NULL;
+
+void SDL_SetX11EventHook(SDL_X11EventHook callback, void *userdata)
+{
+    g_X11EventHook = callback;
+    g_X11EventHookData = userdata;
+}
+
 #ifdef SDL_VIDEO_DRIVER_X11_SUPPORTS_GENERIC_EVENTS
 static void X11_HandleGenericEvent(SDL_VideoData *videodata, XEvent *xev)
 {
     /* event is a union, so cookie == &event, but this is type safe. */
     XGenericEventCookie *cookie = &xev->xcookie;
     if (X11_XGetEventData(videodata->display, cookie)) {
-        X11_HandleXinput2Event(videodata, cookie);
-
-        /* Send a SDL_EVENT_SYSWM if the application wants them.
-         * Since event data is only available until XFreeEventData is called,
-         * the *only* way for an application to access it is to register an event filter/watcher
-         * and do all the processing on the SDL_EVENT_SYSWM inside the callback. */
-        if (SDL_EventEnabled(SDL_EVENT_SYSWM)) {
-            SDL_SysWMmsg wmmsg;
-
-            wmmsg.version = SDL_SYSWM_CURRENT_VERSION;
-            wmmsg.subsystem = SDL_SYSWM_X11;
-            wmmsg.msg.x11.event = *xev;
-            SDL_SendSysWMEvent(&wmmsg);
+        if (!g_X11EventHook || g_X11EventHook(g_X11EventHookData, xev)) {
+            X11_HandleXinput2Event(videodata, cookie);
         }
-
         X11_XFreeEventData(videodata->display, cookie);
     }
 }
@@ -689,7 +685,7 @@ static void X11_HandleClipboardEvent(SDL_VideoDevice *_this, const XEvent *xeven
                     /* FIXME: We don't support the X11 INCR protocol for large clipboards. Do we want that? - Yes, yes we do. */
                     /* This is a safe cast, XChangeProperty() doesn't take a const value, but it doesn't modify the data */
                     seln_data = (unsigned char *)clipboard->callback(clipboard->userdata, mime_type, &seln_length);
-                    if (seln_data != NULL) {
+                    if (seln_data) {
                         X11_XChangeProperty(display, req->requestor, req->property,
                                             req->target, 8, PropModeReplace,
                                             seln_data, seln_length);
@@ -779,7 +775,7 @@ static int XLookupStringAsUTF8(XKeyEvent *event_struct, char *buffer_return, int
 {
     int result = X11_XLookupString(event_struct, buffer_return, bytes_buffer, keysym_return, status_in_out);
     if (IsHighLatin1(buffer_return, result)) {
-        char *utf8_text = SDL_iconv_string("UTF-8", "ISO-8859-1", buffer_return, result);
+        char *utf8_text = SDL_iconv_string("UTF-8", "ISO-8859-1", buffer_return, result + 1);
         if (utf8_text) {
             SDL_strlcpy(buffer_return, utf8_text, bytes_buffer);
             SDL_free(utf8_text);
@@ -870,21 +866,18 @@ static void X11_DispatchEvent(SDL_VideoDevice *_this, XEvent *xevent)
     }
 #endif
 
+    /* Calling the event hook for generic events happens in X11_HandleGenericEvent(), where the event data is available */
+    if (g_X11EventHook) {
+        if (!g_X11EventHook(g_X11EventHookData, xevent)) {
+            return;
+        }
+    }
+
 #ifdef SDL_VIDEO_DRIVER_X11_XRANDR
     if (videodata->xrandr_event_base && (xevent->type == (videodata->xrandr_event_base + RRNotify))) {
         X11_HandleXRandREvent(_this, xevent);
     }
 #endif
-
-    /* Send a SDL_EVENT_SYSWM if the application wants them */
-    if (SDL_EventEnabled(SDL_EVENT_SYSWM)) {
-        SDL_SysWMmsg wmmsg;
-
-        wmmsg.version = SDL_SYSWM_CURRENT_VERSION;
-        wmmsg.subsystem = SDL_SYSWM_X11;
-        wmmsg.msg.x11.event = *xevent;
-        SDL_SendSysWMEvent(&wmmsg);
-    }
 
 #if 0
     printf("type = %d display = %d window = %d\n",
@@ -928,7 +921,7 @@ static void X11_DispatchEvent(SDL_VideoDevice *_this, XEvent *xevent)
             }
         }
     }
-    if (data == NULL) {
+    if (!data) {
         /* The window for KeymapNotify, etc events is 0 */
         if (xevent->type == KeymapNotify) {
 #ifdef DEBUG_XEVENTS
@@ -1264,7 +1257,7 @@ static void X11_DispatchEvent(SDL_VideoDevice *_this, XEvent *xevent)
                 SDL_IME_UpdateTextRect(NULL);
             }
 #endif
-            for (w = data->window->first_child; w != NULL; w = w->next_sibling) {
+            for (w = data->window->first_child; w; w = w->next_sibling) {
                 /* Don't update hidden child windows, their relative position doesn't change */
                 if (!(w->flags & SDL_WINDOW_HIDDEN)) {
                     X11_UpdateWindowPosition(w);
@@ -1327,7 +1320,7 @@ static void X11_DispatchEvent(SDL_VideoDevice *_this, XEvent *xevent)
                 X11_XTranslateCoordinates(display, DefaultRootWindow(display), data->xwindow,
                         root_x, root_y, &window_x, &window_y, &ChildReturn);
 
-                SDL_SendDropPosition(data->window, NULL, (float)window_x, (float)window_y); /* FIXME, can we get the filename ? */
+                SDL_SendDropPosition(data->window, (float)window_x, (float)window_y);
             }
 
             /* reply with status */
@@ -1623,13 +1616,13 @@ static void X11_DispatchEvent(SDL_VideoDevice *_this, XEvent *xevent)
                 char *name = X11_XGetAtomName(display, target);
                 if (name) {
                     char *token = SDL_strtok_r((char *)p.data, "\r\n", &saveptr);
-                    while (token != NULL) {
+                    while (token) {
                         if (SDL_strcmp("text/plain", name) == 0) {
                             SDL_SendDropText(data->window, token);
                         } else if (SDL_strcmp("text/uri-list", name) == 0) {
                             char *fn = X11_URIToLocal(token);
                             if (fn) {
-                                SDL_SendDropFile(data->window, fn);
+                                SDL_SendDropFile(data->window, NULL, fn);
                             }
                         }
                         token = SDL_strtok_r(NULL, "\r\n", &saveptr);

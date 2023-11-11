@@ -34,7 +34,15 @@
 #endif
 
 #ifdef __EMSCRIPTEN__
-#include <emscripten.h>
+    #include <emscripten.h>
+    /* older Emscriptens don't have this, but we need to for wasm64 compatibility. */
+    #ifndef MAIN_THREAD_EM_ASM_PTR
+        #ifdef __wasm64__
+            #error You need to upgrade your Emscripten compiler to support wasm64
+        #else
+            #define MAIN_THREAD_EM_ASM_PTR MAIN_THREAD_EM_ASM_INT
+        #endif
+    #endif
 #endif
 
 /* The size of the stack buffer to use for rendering assert messages. */
@@ -98,11 +106,11 @@ static void SDL_GenerateAssertionReport(void)
     const SDL_AssertData *item = triggered_assertions;
 
     /* only do this if the app hasn't assigned an assertion handler. */
-    if ((item != NULL) && (assertion_handler != SDL_PromptAssertion)) {
+    if ((item) && (assertion_handler != SDL_PromptAssertion)) {
         debug_print("\n\nSDL assertion report.\n");
         debug_print("All SDL assertions between last init/quit:\n\n");
 
-        while (item != NULL) {
+        while (item) {
             debug_print(
                 "'%s'\n"
                 "    * %s (%s:%d)\n"
@@ -190,7 +198,7 @@ static SDL_AssertState SDLCALL SDL_PromptAssertion(const SDL_AssertData *data, v
 
     /* let env. variable override, so unit tests won't block in a GUI. */
     envr = SDL_getenv("SDL_ASSERT");
-    if (envr != NULL) {
+    if (envr) {
         if (message != stack_buf) {
             SDL_free(message);
         }
@@ -211,7 +219,7 @@ static SDL_AssertState SDLCALL SDL_PromptAssertion(const SDL_AssertData *data, v
     }
 
     /* Leave fullscreen mode, if possible (scary!) */
-    window = SDL_GetFocusWindow();
+    window = SDL_GetToplevelForKeyboardFocus();
     if (window) {
         if (window->fullscreen_exclusive) {
             SDL_MinimizeWindow(window);
@@ -243,7 +251,7 @@ static SDL_AssertState SDLCALL SDL_PromptAssertion(const SDL_AssertData *data, v
         for (;;) {
             SDL_bool okay = SDL_TRUE;
             /* *INDENT-OFF* */ /* clang-format off */
-            char *buf = (char *) EM_ASM_INT({
+            char *buf = (char *) MAIN_THREAD_EM_ASM_PTR({
                 var str =
                     UTF8ToString($0) + '\n\n' +
                     'Abort/Retry/Ignore/AlwaysIgnore? [ariA] :';
@@ -326,9 +334,9 @@ SDL_AssertState SDL_ReportAssertion(SDL_AssertData *data, const char *func, cons
 #ifndef SDL_THREADS_DISABLED
     static SDL_SpinLock spinlock = 0;
     SDL_AtomicLock(&spinlock);
-    if (assertion_mutex == NULL) { /* never called SDL_Init()? */
+    if (!assertion_mutex) { /* never called SDL_Init()? */
         assertion_mutex = SDL_CreateMutex();
-        if (assertion_mutex == NULL) {
+        if (!assertion_mutex) {
             SDL_AtomicUnlock(&spinlock);
             return SDL_ASSERTION_IGNORE; /* oh well, I guess. */
         }
@@ -393,7 +401,7 @@ void SDL_AssertionsQuit(void)
 #if SDL_ASSERT_LEVEL > 0
     SDL_GenerateAssertionReport();
 #ifndef SDL_THREADS_DISABLED
-    if (assertion_mutex != NULL) {
+    if (assertion_mutex) {
         SDL_DestroyMutex(assertion_mutex);
         assertion_mutex = NULL;
     }
@@ -421,7 +429,7 @@ void SDL_ResetAssertionReport(void)
 {
     SDL_AssertData *next = NULL;
     SDL_AssertData *item;
-    for (item = triggered_assertions; item != NULL; item = next) {
+    for (item = triggered_assertions; item; item = next) {
         next = (SDL_AssertData *)item->next;
         item->always_ignore = SDL_FALSE;
         item->trigger_count = 0;
@@ -438,7 +446,7 @@ SDL_AssertionHandler SDL_GetDefaultAssertionHandler(void)
 
 SDL_AssertionHandler SDL_GetAssertionHandler(void **userdata)
 {
-    if (userdata != NULL) {
+    if (userdata) {
         *userdata = assertion_userdata;
     }
     return assertion_handler;

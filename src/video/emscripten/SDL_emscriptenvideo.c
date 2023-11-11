@@ -61,7 +61,7 @@ static SDL_VideoDevice *Emscripten_CreateDevice(void)
 
     /* Initialize all variables that we clean on shutdown */
     device = (SDL_VideoDevice *)SDL_calloc(1, sizeof(SDL_VideoDevice));
-    if (device == NULL) {
+    if (!device) {
         SDL_OutOfMemory();
         return 0;
     }
@@ -180,7 +180,7 @@ static int Emscripten_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window)
 
     /* Allocate window internal data */
     wdata = (SDL_WindowData *)SDL_calloc(1, sizeof(SDL_WindowData));
-    if (wdata == NULL) {
+    if (!wdata) {
         return SDL_OutOfMemory();
     }
 
@@ -293,7 +293,7 @@ static void Emscripten_SetWindowFullscreen(SDL_VideoDevice *_this, SDL_Window *w
 
         if (fullscreen) {
             EmscriptenFullscreenStrategy strategy;
-            SDL_bool is_fullscreen_desktop = window->fullscreen_exclusive ? SDL_FALSE : SDL_TRUE;
+            SDL_bool is_fullscreen_desktop = !window->fullscreen_exclusive;
             int res;
 
             strategy.scaleMode = is_fullscreen_desktop ? EMSCRIPTEN_FULLSCREEN_SCALE_STRETCH : EMSCRIPTEN_FULLSCREEN_SCALE_ASPECT;

@@ -26,8 +26,6 @@
 #include "SDL_BWin.h"
 #include <new>
 
-#include <SDL3/SDL_syswm.h>
-
 /* Define a path to window's BWIN data */
 #ifdef __cplusplus
 extern "C" {
@@ -67,7 +65,7 @@ static int _InitWindow(SDL_VideoDevice *_this, SDL_Window *window) {
     }
 
     SDL_BWin *bwin = new(std::nothrow) SDL_BWin(bounds, look, flags);
-    if (bwin == NULL) {
+    if (!bwin) {
         return -1;
     }
 
@@ -210,13 +208,6 @@ void HAIKU_DestroyWindow(SDL_VideoDevice *_this, SDL_Window * window) {
     _ToBeWin(window)->Quit();
     window->driverdata = NULL;
 }
-
-int HAIKU_GetWindowWMInfo(SDL_VideoDevice *_this, SDL_Window *window, struct SDL_SysWMinfo *info)
-{
-    info->subsystem = SDL_SYSWM_HAIKU;
-    return 0;
-}
-
 
 #ifdef __cplusplus
 }

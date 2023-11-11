@@ -1,6 +1,9 @@
 #
 # CMake script for building the SDL tests
 #
+
+include(CheckStructHasMember)
+
 if(SDL_TESTS_LINK_SHARED)
     set(sdl_name_component SDL3-shared)
 else()
@@ -44,11 +47,16 @@ if(WINDOWS_STORE)
     target_link_libraries(sdl_test_main_uwp PRIVATE SDL3::Headers)
     target_compile_options(sdl_test_main_uwp PRIVATE "/ZW")
 
+    add_library(sdl_test_main_callbacks_uwp OBJECT main.cpp)
+    target_link_libraries(sdl_test_main_callbacks_uwp PRIVATE SDL3::Headers)
+    target_compile_options(sdl_test_main_callbacks_uwp PRIVATE "/ZW")
+    target_compile_definitions(sdl_test_main_callbacks_uwp PRIVATE "SDL_MAIN_USE_CALLBACKS")
+
     set_source_files_properties(${RESOURCE_FILES} PROPERTIES VS_DEPLOYENT_LOCATION "Assets")
 endif()
 
 macro(add_sdl_test_executable TARGET)
-    cmake_parse_arguments(AST "BUILD_DEPENDENT;NONINTERACTIVE;NEEDS_RESOURCES;TESTUTILS;NO_C90" "" "NONINTERACTIVE_TIMEOUT;NONINTERACTIVE_ARGS;SOURCES" ${ARGN})
+    cmake_parse_arguments(AST "BUILD_DEPENDENT;NONINTERACTIVE;NEEDS_RESOURCES;TESTUTILS;NO_C90;MAIN_CALLBACKS" "" "NONINTERACTIVE_TIMEOUT;NONINTERACTIVE_ARGS;SOURCES" ${ARGN})
     if(AST_UNPARSED_ARGUMENTS)
         message(FATAL_ERROR "Unknown argument(s): ${AST_UNPARSED_ARGUMENTS}")
     endif()
@@ -70,8 +78,14 @@ macro(add_sdl_test_executable TARGET)
             TARGET "${TARGET}"
         )
         set_property(SOURCE "${uwp_bindir}/${TARGET}.appxmanifest" PROPERTY VS_DEPLOYMENT_CONTENT 1)
+
+        if(AST_MAIN_CALLBACKS)
+            list(APPEND EXTRA_SOURCES "$<TARGET_OBJECTS:sdl_test_main_callbacks_uwp>")
+        else()
+            list(APPEND EXTRA_SOURCES "$<TARGET_OBJECTS:sdl_test_main_uwp>")
+        endif()
+
         list(APPEND EXTRA_SOURCES
-            "$<TARGET_OBJECTS:sdl_test_main_uwp>"
             "${uwp_bindir}/${TARGET}.appxmanifest"
             "uwp/logo-50x50.png"
             "uwp/square-44x44.png"
@@ -182,19 +196,45 @@ if(HAVE_LIBUDEV_H)
     add_definitions(-DHAVE_LIBUDEV_H)
 endif()
 
+set(FFmpeg_FIND_COMPONENTS AVCODEC AVFORMAT AVUTIL SWSCALE)
+include("${SDL3_SOURCE_DIR}/cmake/FindFFmpeg.cmake")
+if(FFmpeg_FOUND)
+    cmake_push_check_state()
+    list(APPEND CMAKE_REQUIRED_INCLUDES "${FFmpeg_AVUTIL_INCLUDE_DIRS}")
+    check_struct_has_member("AVFrame" "ch_layout" "libavutil/frame.h" LIBAVUTIL_AVFRAME_HAS_CH_LAYOUT)
+    cmake_pop_check_state()
+endif()
+if(FFmpeg_FOUND AND LIBAVUTIL_AVFRAME_HAS_CH_LAYOUT)
+    add_sdl_test_executable(testffmpeg NO_C90 SOURCES testffmpeg.c ${icon_bmp_header})
+    if(APPLE)
+        target_sources(testffmpeg PRIVATE testffmpeg_videotoolbox.m)
+        target_link_options(testffmpeg PRIVATE "-Wl,-framework,CoreFoundation" "-Wl,-framework,CoreVideo" "-Wl,-framework,Metal")
+    endif()
+    if(HAVE_OPENGLES_V2)
+        message(DEBUG "Enabling EGL support in testffmpeg")
+        target_compile_definitions(testffmpeg PRIVATE HAVE_EGL)
+        if(TARGET OpenGL::EGL)
+            target_link_libraries(testffmpeg PRIVATE OpenGL::EGL)
+        endif()
+    endif()
+    target_link_libraries(testffmpeg PRIVATE ${FFMPEG_LIBRARIES})
+else()
+    message(STATUS "Can't find ffmpeg 5.1.3 or newer, skipping testffmpeg")
+endif()
+
 add_sdl_test_executable(checkkeys SOURCES checkkeys.c)
 add_sdl_test_executable(checkkeysthreads SOURCES checkkeysthreads.c)
-add_sdl_test_executable(loopwave NEEDS_RESOURCES TESTUTILS SOURCES loopwave.c)
+add_sdl_test_executable(loopwave NEEDS_RESOURCES TESTUTILS MAIN_CALLBACKS SOURCES loopwave.c)
 add_sdl_test_executable(testsurround SOURCES testsurround.c)
 add_sdl_test_executable(testresample NEEDS_RESOURCES SOURCES testresample.c)
 add_sdl_test_executable(testaudioinfo SOURCES testaudioinfo.c)
 add_sdl_test_executable(testaudiostreamdynamicresample NEEDS_RESOURCES TESTUTILS SOURCES testaudiostreamdynamicresample.c)
 
 file(GLOB TESTAUTOMATION_SOURCE_FILES testautomation*.c)
-add_sdl_test_executable(testautomation NEEDS_RESOURCES NO_C90 SOURCES ${TESTAUTOMATION_SOURCE_FILES})
+add_sdl_test_executable(testautomation NONINTERACTIVE NONINTERACTIVE_TIMEOUT 120 NEEDS_RESOURCES NO_C90 SOURCES ${TESTAUTOMATION_SOURCE_FILES})
 add_sdl_test_executable(testmultiaudio NEEDS_RESOURCES TESTUTILS SOURCES testmultiaudio.c)
 add_sdl_test_executable(testaudiohotplug NEEDS_RESOURCES TESTUTILS SOURCES testaudiohotplug.c)
-add_sdl_test_executable(testaudiocapture SOURCES testaudiocapture.c)
+add_sdl_test_executable(testaudiocapture MAIN_CALLBACKS SOURCES testaudiocapture.c)
 add_sdl_test_executable(testatomic NONINTERACTIVE SOURCES testatomic.c)
 add_sdl_test_executable(testintersections SOURCES testintersections.c)
 add_sdl_test_executable(testrelative SOURCES testrelative.c)
@@ -230,7 +270,31 @@ elseif(HAVE_X11)
     target_link_libraries(testnative PRIVATE X11)
 endif()
 
-set(gamepad_images
+find_package(Python3)
+function(files2headers OUTPUT)
+    set(xxd "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/xxd.py")
+    set(inputs ${ARGN})
+    set(outputs )
+    foreach(input IN LISTS inputs)
+        get_filename_component(file_we "${input}" NAME_WE)
+        set(intermediate "${CMAKE_CURRENT_BINARY_DIR}/${file_we}.h")
+        set(output "${CMAKE_CURRENT_SOURCE_DIR}/${file_we}.h")
+        list(APPEND outputs "${output}")
+        if(Python3_FOUND AND Python3_VERSION VERSION_GREATER_EQUAL "3.2")
+            list(APPEND outputs  "${intermediate}")
+            # Don't add the 'output' header to the output, to avoid marking them as GENERATED
+            # (generated files are removed when running the CLEAN target)
+            add_custom_command(OUTPUT "${intermediate}"
+                COMMAND Python3::Interpreter "${xxd}" -i "${CMAKE_CURRENT_SOURCE_DIR}/${input}" "-o" "${intermediate}"
+                COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${intermediate}" "${output}"
+                DEPENDS "${xxd}" "${bmp}"
+            )
+        endif()
+    endforeach()
+    set(${OUTPUT} "${outputs}" PARENT_SCOPE)
+endfunction()
+
+files2headers(gamepad_image_headers
     gamepad_axis_arrow.bmp
     gamepad_axis.bmp
     gamepad_back.bmp
@@ -249,26 +313,9 @@ set(gamepad_images
     gamepad_front.bmp
     gamepad_touchpad.bmp
 )
-set(gamepad_image_headers)
-find_package(Python3)
-if(Python3_FOUND AND Python3_VERSION VERSION_GREATER_EQUAL "3.2")
-    set(xxd "${CMAKE_CURRENT_SOURCE_DIR}/../cmake/xxd.py")
-    foreach(bmp ${gamepad_images})
-        get_filename_component(bmp_we "${bmp}" NAME_WE)
-        set(intermediate "${CMAKE_CURRENT_BINARY_DIR}/${bmp_we}.h")
-        set(final "${CMAKE_CURRENT_SOURCE_DIR}/${bmp_we}.h")
-        # Don't add the 'final' headers to the output, to avoid marking them as GENERATED
-        # (generated files are removed when running the CLEAN target)
-        add_custom_command(OUTPUT "${intermediate}"
-            COMMAND Python3::Interpreter "${xxd}" -i "${CMAKE_CURRENT_SOURCE_DIR}/${bmp}" "-o" "${intermediate}"
-            COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${intermediate}" "${final}"
-            DEPENDS "${xxd}" "${bmp}"
-        )
-        list(APPEND gamepad_image_headers "${intermediate}" "${final}")
-    endforeach()
-endif()
+files2headers(icon_bmp_header icon.bmp)
 
-add_sdl_test_executable(testaudio NEEDS_RESOURCES TESTUTILS SOURCES testaudio.c)
+add_sdl_test_executable(testaudio MAIN_CALLBACKS NEEDS_RESOURCES TESTUTILS SOURCES testaudio.c)
 add_sdl_test_executable(testfile NONINTERACTIVE SOURCES testfile.c)
 add_sdl_test_executable(testcontroller TESTUTILS SOURCES testcontroller.c gamepadutils.c ${gamepad_image_headers})
 add_sdl_test_executable(testgeometry TESTUTILS SOURCES testgeometry.c)
@@ -297,7 +344,7 @@ add_sdl_test_executable(testplatform NONINTERACTIVE SOURCES testplatform.c)
 add_sdl_test_executable(testpower NONINTERACTIVE SOURCES testpower.c)
 add_sdl_test_executable(testfilesystem NONINTERACTIVE SOURCES testfilesystem.c)
 if(WIN32 AND CMAKE_SIZEOF_VOID_P EQUAL 4)
-    add_sdl_test_executable(testfilesystem_pre SOURCES testfilesystem_pre.c NONINTERACTIVE NONINTERACTIVE_TIMEOUT 60)
+    add_sdl_test_executable(pretest SOURCES pretest.c NONINTERACTIVE NONINTERACTIVE_TIMEOUT 60)
 endif()
 add_sdl_test_executable(testrendertarget NEEDS_RESOURCES TESTUTILS SOURCES testrendertarget.c)
 add_sdl_test_executable(testscale NEEDS_RESOURCES TESTUTILS SOURCES testscale.c)
@@ -305,12 +352,14 @@ add_sdl_test_executable(testsem NONINTERACTIVE NONINTERACTIVE_ARGS 10 NONINTERAC
 add_sdl_test_executable(testsensor SOURCES testsensor.c)
 add_sdl_test_executable(testshader NEEDS_RESOURCES TESTUTILS SOURCES testshader.c)
 add_sdl_test_executable(testshape NEEDS_RESOURCES SOURCES testshape.c)
-add_sdl_test_executable(testsprite NEEDS_RESOURCES TESTUTILS SOURCES testsprite.c)
-add_sdl_test_executable(testspriteminimal NEEDS_RESOURCES TESTUTILS SOURCES testspriteminimal.c)
+add_sdl_test_executable(testsprite MAIN_CALLBACKS NEEDS_RESOURCES TESTUTILS SOURCES testsprite.c)
+add_sdl_test_executable(testspriteminimal SOURCES testspriteminimal.c ${icon_bmp_header})
 add_sdl_test_executable(teststreaming NEEDS_RESOURCES TESTUTILS SOURCES teststreaming.c)
-add_sdl_test_executable(testtimer NONINTERACTIVE NONINTERACTIVE_TIMEOUT 60 SOURCES testtimer.c)
+add_sdl_test_executable(testtimer NONINTERACTIVE NONINTERACTIVE_ARGS --no-interactive NONINTERACTIVE_TIMEOUT 60 SOURCES testtimer.c)
 add_sdl_test_executable(testurl SOURCES testurl.c)
 add_sdl_test_executable(testver NONINTERACTIVE SOURCES testver.c)
+add_sdl_test_executable(testvideocapture SOURCES testvideocapture.c)
+add_sdl_test_executable(testvideocaptureminimal SOURCES testvideocaptureminimal.c)
 add_sdl_test_executable(testviewport NEEDS_RESOURCES TESTUTILS SOURCES testviewport.c)
 add_sdl_test_executable(testwm SOURCES testwm.c)
 add_sdl_test_executable(testyuv NONINTERACTIVE NONINTERACTIVE_ARGS "--automated" NEEDS_RESOURCES TESTUTILS SOURCES testyuv.c testyuv_cvt.c)
@@ -504,12 +553,11 @@ foreach(TEST ${SDL_TEST_EXECUTABLES})
                 DESTINATION ${CMAKE_INSTALL_DATADIR}/installed-tests/SDL3
             )
         endif()
+        if(TARGET pretest AND NOT "${TEST}" MATCHES "pretest")
+            set_property(TEST ${TEST} APPEND PROPERTY DEPENDS pretest)
+        endif()
     endif()
 endforeach()
-
-if(TARGET testfilesystem_pre)
-    set_property(TEST testfilesystem APPEND PROPERTY DEPENDS testfilesystem_pre)
-endif()
 
 if(SDL_INSTALL_TESTS)
     if(RISCOS)
@@ -522,6 +570,11 @@ if(SDL_INSTALL_TESTS)
             TARGETS ${SDL_TEST_EXECUTABLES}
             DESTINATION ${CMAKE_INSTALL_LIBEXECDIR}/installed-tests/SDL3
         )
+    endif()
+    if(MSVC)
+        foreach(test IN LISTS SDL_TEST_EXECUTABLES)
+            SDL_install_pdb(${test} "${CMAKE_INSTALL_LIBEXECDIR}/installed-tests/SDL3")
+        endforeach()
     endif()
     install(
         FILES ${RESOURCE_FILES}

@@ -53,9 +53,6 @@ extern void SDL_AssertJoysticksLocked(void) SDL_ASSERT_CAPABILITY(SDL_joystick_l
 /* Function to return whether there are any joysticks opened by the application */
 extern SDL_bool SDL_JoysticksOpened(void);
 
-/* Function to get the next available joystick instance ID */
-extern SDL_JoystickID SDL_GetNextJoystickInstanceID(void);
-
 /* Function to standardize the name for a controller
    This should be freed with SDL_free() when no longer needed
  */
@@ -110,6 +107,9 @@ extern SDL_bool SDL_IsJoystickNintendoSwitchJoyConLeft(Uint16 vendor_id, Uint16 
 extern SDL_bool SDL_IsJoystickNintendoSwitchJoyConRight(Uint16 vendor_id, Uint16 product_id);
 extern SDL_bool SDL_IsJoystickNintendoSwitchJoyConGrip(Uint16 vendor_id, Uint16 product_id);
 extern SDL_bool SDL_IsJoystickNintendoSwitchJoyConPair(Uint16 vendor_id, Uint16 product_id);
+
+/* Function to return whether a joystick is a Nintendo GameCube style controller */
+extern SDL_bool SDL_IsJoystickGameCube(Uint16 vendor_id, Uint16 product_id);
 
 /* Function to return whether a joystick is an Amazon Luna controller */
 extern SDL_bool SDL_IsJoystickAmazonLunaController(Uint16 vendor_id, Uint16 product_id);

@@ -58,7 +58,6 @@ static SDL_AtomicInt SDL_sensor_lock_pending;
 static int SDL_sensors_locked;
 static SDL_bool SDL_sensors_initialized;
 static SDL_Sensor *SDL_sensors SDL_GUARDED_BY(SDL_sensor_lock) = NULL;
-static SDL_AtomicInt SDL_last_sensor_instance_id SDL_GUARDED_BY(SDL_sensor_lock);
 static char SDL_sensor_magic;
 
 #define CHECK_SENSOR_MAGIC(sensor, retval)              \
@@ -116,7 +115,7 @@ void SDL_UnlockSensors(void)
 
 SDL_bool SDL_SensorsLocked(void)
 {
-    return (SDL_sensors_locked > 0) ? SDL_TRUE : SDL_FALSE;
+    return (SDL_sensors_locked > 0);
 }
 
 void SDL_AssertSensorsLocked(void)
@@ -216,15 +215,6 @@ SDL_SensorID *SDL_GetSensors(int *count)
     SDL_UnlockSensors();
 
     return sensors;
-}
-
-/*
- * Return the next available sensor instance ID
- * This may be called by drivers from multiple threads, unprotected by any locks
- */
-SDL_SensorID SDL_GetNextSensorInstanceID(void)
-{
-    return SDL_AtomicIncRef(&SDL_last_sensor_instance_id) + 1;
 }
 
 /*
@@ -339,7 +329,7 @@ SDL_Sensor *SDL_OpenSensor(SDL_SensorID instance_id)
 
     /* Create and initialize the sensor */
     sensor = (SDL_Sensor *)SDL_calloc(sizeof(*sensor), 1);
-    if (sensor == NULL) {
+    if (!sensor) {
         SDL_OutOfMemory();
         SDL_UnlockSensors();
         return NULL;
@@ -391,6 +381,27 @@ SDL_Sensor *SDL_GetSensorFromInstanceID(SDL_SensorID instance_id)
     }
     SDL_UnlockSensors();
     return sensor;
+}
+
+/*
+ * Get the properties associated with a sensor.
+ */
+SDL_PropertiesID SDL_GetSensorProperties(SDL_Sensor *sensor)
+{
+    SDL_PropertiesID retval;
+
+    SDL_LockSensors();
+    {
+        CHECK_SENSOR_MAGIC(sensor, 0);
+
+        if (sensor->props == 0) {
+            sensor->props = SDL_CreateProperties();
+        }
+        retval = sensor->props;
+    }
+    SDL_UnlockSensors();
+
+    return retval;
 }
 
 /*
@@ -499,6 +510,8 @@ void SDL_CloseSensor(SDL_Sensor *sensor)
             SDL_UnlockSensors();
             return;
         }
+
+        SDL_DestroyProperties(sensor->props);
 
         sensor->driver->Close(sensor);
         sensor->hwdata = NULL;

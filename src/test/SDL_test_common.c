@@ -102,7 +102,7 @@ SDLTest_CommonState *SDLTest_CommonCreateState(char **argv, Uint32 flags)
     }
 
     state = (SDLTest_CommonState *)SDL_calloc(1, sizeof(*state));
-    if (state == NULL) {
+    if (!state) {
         SDL_OutOfMemory();
         return NULL;
     }
@@ -147,8 +147,8 @@ SDLTest_CommonState *SDLTest_CommonCreateState(char **argv, Uint32 flags)
 }
 
 void SDLTest_CommonDestroyState(SDLTest_CommonState *state) {
-    SDLTest_LogAllocations();
     SDL_free(state);
+    SDLTest_LogAllocations();
 }
 
 #define SEARCHARG(dim)                  \
@@ -1090,7 +1090,7 @@ static SDL_Surface *SDLTest_LoadIcon(const char *file)
 
     /* Load the icon surface */
     icon = SDL_LoadBMP(file);
-    if (icon == NULL) {
+    if (!icon) {
         SDL_Log("Couldn't load %s: %s\n", file, SDL_GetError());
         return NULL;
     }
@@ -1539,10 +1539,10 @@ static const char *GamepadButtonName(const SDL_GamepadButton button)
     case SDL_GAMEPAD_BUTTON_##btn: \
         return #btn
         BUTTON_CASE(INVALID);
-        BUTTON_CASE(A);
-        BUTTON_CASE(B);
-        BUTTON_CASE(X);
-        BUTTON_CASE(Y);
+        BUTTON_CASE(SOUTH);
+        BUTTON_CASE(EAST);
+        BUTTON_CASE(WEST);
+        BUTTON_CASE(NORTH);
         BUTTON_CASE(BACK);
         BUTTON_CASE(GUIDE);
         BUTTON_CASE(START);
@@ -1560,14 +1560,14 @@ static const char *GamepadButtonName(const SDL_GamepadButton button)
     }
 }
 
-static void SDLTest_PrintEvent(SDL_Event *event)
+static void SDLTest_PrintEvent(const SDL_Event *event)
 {
     switch (event->type) {
     case SDL_EVENT_SYSTEM_THEME_CHANGED:
         SDL_Log("SDL EVENT: System theme changed to %s\n", SystemThemeName());
         break;
-    case SDL_EVENT_DISPLAY_CONNECTED:
-        SDL_Log("SDL EVENT: Display %" SDL_PRIu32 " connected",
+    case SDL_EVENT_DISPLAY_ADDED:
+        SDL_Log("SDL EVENT: Display %" SDL_PRIu32 " attached",
                 event->display.displayID);
         break;
     case SDL_EVENT_DISPLAY_CONTENT_SCALE_CHANGED:
@@ -1585,8 +1585,8 @@ static void SDLTest_PrintEvent(SDL_Event *event)
         SDL_Log("SDL EVENT: Display %" SDL_PRIu32 " changed orientation to %s",
                 event->display.displayID, DisplayOrientationName(event->display.data1));
         break;
-    case SDL_EVENT_DISPLAY_DISCONNECTED:
-        SDL_Log("SDL EVENT: Display %" SDL_PRIu32 " disconnected",
+    case SDL_EVENT_DISPLAY_REMOVED:
+        SDL_Log("SDL EVENT: Display %" SDL_PRIu32 " removed",
                 event->display.displayID);
         break;
     case SDL_EVENT_WINDOW_SHOWN:
@@ -1820,13 +1820,16 @@ static void SDLTest_PrintEvent(SDL_Event *event)
         SDL_Log("SDL EVENT: App entered the foreground");
         break;
     case SDL_EVENT_DROP_BEGIN:
-        SDL_Log("SDL EVENT: Drag and drop beginning");
+        SDL_Log("SDL EVENT: Drag and drop beginning in window %" SDL_PRIu32 "", event->drop.windowID);
+        break;
+    case SDL_EVENT_DROP_POSITION:
+        SDL_Log("SDL EVENT: Drag and drop moving in window %" SDL_PRIu32 ": %g,%g", event->drop.windowID, event->drop.x, event->drop.y);
         break;
     case SDL_EVENT_DROP_FILE:
-        SDL_Log("SDL EVENT: Drag and drop file: '%s'", event->drop.file);
+        SDL_Log("SDL EVENT: Drag and drop file in window %" SDL_PRIu32 ": '%s'", event->drop.windowID, event->drop.data);
         break;
     case SDL_EVENT_DROP_TEXT:
-        SDL_Log("SDL EVENT: Drag and drop text: '%s'", event->drop.file);
+        SDL_Log("SDL EVENT: Drag and drop text in window %" SDL_PRIu32 ": '%s'", event->drop.windowID, event->drop.data);
         break;
     case SDL_EVENT_DROP_COMPLETE:
         SDL_Log("SDL EVENT: Drag and drop ending");
@@ -1916,7 +1919,7 @@ static void SDLTest_CopyScreenShot(SDL_Renderer *renderer)
     };
     SDLTest_ClipboardData *clipboard_data;
 
-    if (renderer == NULL) {
+    if (!renderer) {
         return;
     }
 
@@ -1924,7 +1927,7 @@ static void SDLTest_CopyScreenShot(SDL_Renderer *renderer)
 
     surface = SDL_CreateSurface(viewport.w, viewport.h, SDL_PIXELFORMAT_BGR24);
 
-    if (surface == NULL) {
+    if (!surface) {
         SDL_Log("Couldn't create surface: %s\n", SDL_GetError());
         return;
     }
@@ -2029,7 +2032,7 @@ static void FullscreenTo(SDLTest_CommonState *state, int index, int windowId)
     SDL_free(displays);
 }
 
-void SDLTest_CommonEvent(SDLTest_CommonState *state, SDL_Event *event, int *done)
+int SDLTest_CommonEventMainCallbacks(SDLTest_CommonState *state, const SDL_Event *event)
 {
     int i;
 
@@ -2046,6 +2049,8 @@ void SDLTest_CommonEvent(SDLTest_CommonState *state, SDL_Event *event, int *done
     {
         SDL_Window *window = SDL_GetWindowFromID(event->window.windowID);
         if (window) {
+            /* Clear cache to avoid stale textures */
+            SDLTest_CleanupTextDrawing();
             for (i = 0; i < state->num_windows; ++i) {
                 if (window == state->windows[i]) {
                     if (state->targets[i]) {
@@ -2271,7 +2276,7 @@ void SDLTest_CommonEvent(SDLTest_CommonState *state, SDL_Event *event, int *done
                 /* Ctrl-G toggle mouse grab */
                 SDL_Window *window = SDL_GetWindowFromID(event->key.windowID);
                 if (window) {
-                    SDL_SetWindowGrab(window, !SDL_GetWindowGrab(window) ? SDL_TRUE : SDL_FALSE);
+                    SDL_SetWindowGrab(window, !SDL_GetWindowGrab(window));
                 }
             }
             break;
@@ -2280,7 +2285,7 @@ void SDLTest_CommonEvent(SDLTest_CommonState *state, SDL_Event *event, int *done
                 /* Ctrl-K toggle keyboard grab */
                 SDL_Window *window = SDL_GetWindowFromID(event->key.windowID);
                 if (window) {
-                    SDL_SetWindowKeyboardGrab(window, !SDL_GetWindowKeyboardGrab(window) ? SDL_TRUE : SDL_FALSE);
+                    SDL_SetWindowKeyboardGrab(window, !SDL_GetWindowKeyboardGrab(window));
                 }
             }
             break;
@@ -2309,7 +2314,7 @@ void SDLTest_CommonEvent(SDLTest_CommonState *state, SDL_Event *event, int *done
         case SDLK_r:
             if (withControl) {
                 /* Ctrl-R toggle mouse relative mode */
-                SDL_SetRelativeMouseMode(!SDL_GetRelativeMouseMode() ? SDL_TRUE : SDL_FALSE);
+                SDL_SetRelativeMouseMode(!SDL_GetRelativeMouseMode());
             }
             break;
         case SDLK_t:
@@ -2406,22 +2411,22 @@ void SDLTest_CommonEvent(SDLTest_CommonState *state, SDL_Event *event, int *done
             }
             break;
         case SDLK_ESCAPE:
-            *done = 1;
-            break;
+            return 1;
         default:
             break;
         }
         break;
     }
     case SDL_EVENT_QUIT:
-        *done = 1;
-        break;
-
-    case SDL_EVENT_DROP_FILE:
-    case SDL_EVENT_DROP_TEXT:
-        SDL_free(event->drop.file);
-        break;
+        return 1;
     }
+
+    return 0;  /* keep going */
+}
+
+void SDLTest_CommonEvent(SDLTest_CommonState *state, SDL_Event *event, int *done)
+{
+    *done = SDLTest_CommonEventMainCallbacks(state, event) ? 1 : 0;
 }
 
 void SDLTest_CommonQuit(SDLTest_CommonState *state)
@@ -2435,7 +2440,6 @@ void SDLTest_CommonQuit(SDLTest_CommonState *state)
     common_usage_audio = NULL;
     common_usage_videoaudio = NULL;
 
-    SDL_free(state->windows);
     if (state->targets) {
         for (i = 0; i < state->num_windows; ++i) {
             if (state->targets[i]) {
@@ -2451,6 +2455,12 @@ void SDLTest_CommonQuit(SDLTest_CommonState *state)
             }
         }
         SDL_free(state->renderers);
+    }
+    if (state->windows) {
+        for (i = 0; i < state->num_windows; i++) {
+            SDL_DestroyWindow(state->windows[i]);
+        }
+        SDL_free(state->windows);
     }
     if (state->flags & SDL_INIT_VIDEO) {
         SDL_QuitSubSystem(SDL_INIT_VIDEO);

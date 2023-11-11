@@ -31,6 +31,15 @@
 
 #include "../../events/SDL_mouse_c.h"
 
+/* older Emscriptens don't have this, but we need to for wasm64 compatibility. */
+#ifndef MAIN_THREAD_EM_ASM_PTR
+    #ifdef __wasm64__
+        #error You need to upgrade your Emscripten compiler to support wasm64
+    #else
+        #define MAIN_THREAD_EM_ASM_PTR MAIN_THREAD_EM_ASM_INT
+    #endif
+#endif
+
 static SDL_Cursor *Emscripten_CreateCursorFromString(const char *cursor_str, SDL_bool is_custom)
 {
     SDL_Cursor *cursor;
@@ -39,7 +48,7 @@ static SDL_Cursor *Emscripten_CreateCursorFromString(const char *cursor_str, SDL
     cursor = SDL_calloc(1, sizeof(SDL_Cursor));
     if (cursor) {
         curdata = (Emscripten_CursorData *)SDL_calloc(1, sizeof(*curdata));
-        if (curdata == NULL) {
+        if (!curdata) {
             SDL_OutOfMemory();
             SDL_free(cursor);
             return NULL;
@@ -69,12 +78,12 @@ static SDL_Cursor *Emscripten_CreateCursor(SDL_Surface *surface, int hot_x, int 
 
     conv_surf = SDL_ConvertSurfaceFormat(surface, SDL_PIXELFORMAT_ABGR8888);
 
-    if (conv_surf == NULL) {
+    if (!conv_surf) {
         return NULL;
     }
 
     /* *INDENT-OFF* */ /* clang-format off */
-    cursor_url = (const char *)MAIN_THREAD_EM_ASM_INT({
+    cursor_url = (const char *)MAIN_THREAD_EM_ASM_PTR({
         var w = $0;
         var h = $1;
         var hot_x = $2;
@@ -166,7 +175,7 @@ static void Emscripten_FreeCursor(SDL_Cursor *cursor)
     if (cursor) {
         curdata = (Emscripten_CursorData *)cursor->driverdata;
 
-        if (curdata != NULL) {
+        if (curdata) {
             if (curdata->is_custom) {
                 SDL_free((char *)curdata->system_cursor);
             }
@@ -214,7 +223,7 @@ static int Emscripten_SetRelativeMouseMode(SDL_bool enabled)
     /* TODO: pointer lock isn't actually enabled yet */
     if (enabled) {
         window = SDL_GetMouseFocus();
-        if (window == NULL) {
+        if (!window) {
             return -1;
         }
 

@@ -22,7 +22,7 @@
 /**
  *  \file SDL_gamepad.h
  *
- *  \brief Include file for SDL gamepad event handling
+ *  Include file for SDL gamepad event handling
  */
 
 #ifndef SDL_gamepad_h_
@@ -30,9 +30,10 @@
 
 #include <SDL3/SDL_stdinc.h>
 #include <SDL3/SDL_error.h>
+#include <SDL3/SDL_joystick.h>
+#include <SDL3/SDL_properties.h>
 #include <SDL3/SDL_rwops.h>
 #include <SDL3/SDL_sensor.h>
-#include <SDL3/SDL_joystick.h>
 
 #include <SDL3/SDL_begin_code.h>
 /* Set up for C function definitions, even when using C++ */
@@ -76,14 +77,31 @@ typedef enum
 
 /**
  *  The list of buttons available on a gamepad
+ *
+ *  For controllers that use a diamond pattern for the face buttons,
+ *  the south/east/west/north buttons below correspond to the locations
+ *  in the diamond pattern. For Xbox controllers, this would be A/B/X/Y,
+ *  for Nintendo Switch controllers, this would be B/A/Y/X, for
+ *  PlayStation controllers this would be Cross/Circle/Square/Triangle.
+ *
+ *  For controllers that don't use a diamond pattern for the face buttons,
+ *  the south/east/west/north buttons indicate the buttons labeled A, B,
+ *  C, D, or 1, 2, 3, 4, or for controllers that aren't labeled, they are
+ *  the primary, secondary, etc. buttons.
+ *
+ *  The activate action is often the south button and the cancel action
+ *  is often the east button, but in some regions this is reversed, so
+ *  your game should allow remapping actions based on user preferences.
+ *
+ *  You can query the labels for the face buttons using SDL_GetGamepadButtonLabel()
  */
 typedef enum
 {
     SDL_GAMEPAD_BUTTON_INVALID = -1,
-    SDL_GAMEPAD_BUTTON_A,
-    SDL_GAMEPAD_BUTTON_B,
-    SDL_GAMEPAD_BUTTON_X,
-    SDL_GAMEPAD_BUTTON_Y,
+    SDL_GAMEPAD_BUTTON_SOUTH,           /* Bottom face button (e.g. Xbox A button) */
+    SDL_GAMEPAD_BUTTON_EAST,            /* Right face button (e.g. Xbox B button) */
+    SDL_GAMEPAD_BUTTON_WEST,            /* Left face button (e.g. Xbox X button) */
+    SDL_GAMEPAD_BUTTON_NORTH,           /* Top face button (e.g. Xbox Y button) */
     SDL_GAMEPAD_BUTTON_BACK,
     SDL_GAMEPAD_BUTTON_GUIDE,
     SDL_GAMEPAD_BUTTON_START,
@@ -95,14 +113,34 @@ typedef enum
     SDL_GAMEPAD_BUTTON_DPAD_DOWN,
     SDL_GAMEPAD_BUTTON_DPAD_LEFT,
     SDL_GAMEPAD_BUTTON_DPAD_RIGHT,
-    SDL_GAMEPAD_BUTTON_MISC1,    /* Additional button (e.g. Xbox Series X share button, PS5 microphone button, Nintendo Switch Pro capture button, Amazon Luna microphone button) */
-    SDL_GAMEPAD_BUTTON_RIGHT_PADDLE1,  /* Upper or primary paddle, under your right hand (e.g. Xbox Elite paddle P1) */
-    SDL_GAMEPAD_BUTTON_LEFT_PADDLE1,   /* Upper or primary paddle, under your left hand (e.g. Xbox Elite paddle P3) */
-    SDL_GAMEPAD_BUTTON_RIGHT_PADDLE2,  /* Lower or secondary paddle, under your right hand (e.g. Xbox Elite paddle P2) */
-    SDL_GAMEPAD_BUTTON_LEFT_PADDLE2,   /* Lower or secondary paddle, under your left hand (e.g. Xbox Elite paddle P4) */
-    SDL_GAMEPAD_BUTTON_TOUCHPAD, /* PS4/PS5 touchpad button */
+    SDL_GAMEPAD_BUTTON_MISC1,           /* Additional button (e.g. Xbox Series X share button, PS5 microphone button, Nintendo Switch Pro capture button, Amazon Luna microphone button) */
+    SDL_GAMEPAD_BUTTON_RIGHT_PADDLE1,   /* Upper or primary paddle, under your right hand (e.g. Xbox Elite paddle P1) */
+    SDL_GAMEPAD_BUTTON_LEFT_PADDLE1,    /* Upper or primary paddle, under your left hand (e.g. Xbox Elite paddle P3) */
+    SDL_GAMEPAD_BUTTON_RIGHT_PADDLE2,   /* Lower or secondary paddle, under your right hand (e.g. Xbox Elite paddle P2) */
+    SDL_GAMEPAD_BUTTON_LEFT_PADDLE2,    /* Lower or secondary paddle, under your left hand (e.g. Xbox Elite paddle P4) */
+    SDL_GAMEPAD_BUTTON_TOUCHPAD,        /* PS4/PS5 touchpad button */
     SDL_GAMEPAD_BUTTON_MAX
 } SDL_GamepadButton;
+
+/**
+ *  The set of gamepad button labels
+ *
+ *  This isn't a complete set, just the face buttons to make it easy to show button prompts.
+ *
+ *  For a complete set, you should look at the button and gamepad type and have a set of symbols that work well with your art style.
+ */
+typedef enum
+{
+    SDL_GAMEPAD_BUTTON_LABEL_UNKNOWN,
+    SDL_GAMEPAD_BUTTON_LABEL_A,
+    SDL_GAMEPAD_BUTTON_LABEL_B,
+    SDL_GAMEPAD_BUTTON_LABEL_X,
+    SDL_GAMEPAD_BUTTON_LABEL_Y,
+    SDL_GAMEPAD_BUTTON_LABEL_CROSS,
+    SDL_GAMEPAD_BUTTON_LABEL_CIRCLE,
+    SDL_GAMEPAD_BUTTON_LABEL_SQUARE,
+    SDL_GAMEPAD_BUTTON_LABEL_TRIANGLE
+} SDL_GamepadButtonLabel;
 
 /**
  *  The list of axes available on a gamepad
@@ -124,6 +162,53 @@ typedef enum
     SDL_GAMEPAD_AXIS_RIGHT_TRIGGER,
     SDL_GAMEPAD_AXIS_MAX
 } SDL_GamepadAxis;
+
+typedef enum
+{
+    SDL_GAMEPAD_BINDTYPE_NONE = 0,
+    SDL_GAMEPAD_BINDTYPE_BUTTON,
+    SDL_GAMEPAD_BINDTYPE_AXIS,
+    SDL_GAMEPAD_BINDTYPE_HAT
+} SDL_GamepadBindingType;
+
+typedef struct
+{
+    SDL_GamepadBindingType inputType;
+    union
+    {
+        int button;
+
+        struct
+        {
+            int axis;
+            int axis_min;
+            int axis_max;
+        } axis;
+
+        struct
+        {
+            int hat;
+            int hat_mask;
+        } hat;
+
+    } input;
+
+    SDL_GamepadBindingType outputType;
+    union
+    {
+        SDL_GamepadButton button;
+
+        struct
+        {
+            SDL_GamepadAxis axis;
+            int axis_min;
+            int axis_max;
+        } axis;
+
+    } output;
+
+} SDL_GamepadBinding;
+
 
 /**
  * Add support for gamepads that SDL is unaware of or change the binding of an
@@ -508,6 +593,23 @@ extern DECLSPEC SDL_Gamepad *SDLCALL SDL_GetGamepadFromInstanceID(SDL_JoystickID
 extern DECLSPEC SDL_Gamepad *SDLCALL SDL_GetGamepadFromPlayerIndex(int player_index);
 
 /**
+ * Get the properties associated with an opened gamepad.
+ *
+ * These properties are shared with the underlying joystick object.
+ *
+ * \param gamepad a gamepad identifier previously returned by
+ *                SDL_OpenGamepad()
+ * \returns a valid property ID on success or 0 on failure; call
+ *          SDL_GetError() for more information.
+ *
+ * \since This function is available since SDL 3.0.0.
+ *
+ * \sa SDL_GetProperty
+ * \sa SDL_SetProperty
+ */
+extern DECLSPEC SDL_PropertiesID SDLCALL SDL_GetGamepadProperties(SDL_Gamepad *gamepad);
+
+/**
  * Get the instance ID of an opened gamepad.
  *
  * \param gamepad a gamepad identifier previously returned by
@@ -737,6 +839,19 @@ extern DECLSPEC void SDLCALL SDL_SetGamepadEventsEnabled(SDL_bool enabled);
 extern DECLSPEC SDL_bool SDLCALL SDL_GamepadEventsEnabled(void);
 
 /**
+ * Get the SDL joystick layer bindings for a gamepad
+ *
+ * \param gamepad a gamepad
+ * \param count a pointer filled in with the number of bindings returned
+ * \returns a NULL terminated array of pointers to bindings which should be
+ *          freed with SDL_free(), or NULL on error; call SDL_GetError() for
+ *          more details.
+ *
+ * \since This function is available since SDL 3.0.0.
+ */
+extern DECLSPEC SDL_GamepadBinding **SDLCALL SDL_GetGamepadBindings(SDL_Gamepad *gamepad, int *count);
+
+/**
  * Manually pump gamepad updates if not using the loop.
  *
  * This function is called automatically by the event loop if events are
@@ -911,6 +1026,32 @@ extern DECLSPEC SDL_bool SDLCALL SDL_GamepadHasButton(SDL_Gamepad *gamepad, SDL_
  * \sa SDL_GetGamepadAxis
  */
 extern DECLSPEC Uint8 SDLCALL SDL_GetGamepadButton(SDL_Gamepad *gamepad, SDL_GamepadButton button);
+
+/**
+ * Get the label of a button on a gamepad.
+ *
+ * \param type the type of gamepad to check
+ * \param button a button index (one of the SDL_GamepadButton values)
+ * \returns the SDL_GamepadButtonLabel enum corresponding to the button label
+ *
+ * \since This function is available since SDL 3.0.0.
+ *
+ * \sa SDL_GetGamepadButtonLabel
+ */
+extern DECLSPEC SDL_GamepadButtonLabel SDLCALL SDL_GetGamepadButtonLabelForType(SDL_GamepadType type, SDL_GamepadButton button);
+
+/**
+ * Get the label of a button on a gamepad.
+ *
+ * \param gamepad a gamepad
+ * \param button a button index (one of the SDL_GamepadButton values)
+ * \returns the SDL_GamepadButtonLabel enum corresponding to the button label
+ *
+ * \since This function is available since SDL 3.0.0.
+ *
+ * \sa SDL_GetGamepadButtonLabelForType
+ */
+extern DECLSPEC SDL_GamepadButtonLabel SDLCALL SDL_GetGamepadButtonLabel(SDL_Gamepad *gamepad, SDL_GamepadButton button);
 
 /**
  * Get the number of touchpads on a gamepad.

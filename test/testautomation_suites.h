@@ -22,13 +22,14 @@ extern SDLTest_TestSuiteReference mathTestSuite;
 extern SDLTest_TestSuiteReference mouseTestSuite;
 extern SDLTest_TestSuiteReference pixelsTestSuite;
 extern SDLTest_TestSuiteReference platformTestSuite;
+extern SDLTest_TestSuiteReference propertiesTestSuite;
 extern SDLTest_TestSuiteReference rectTestSuite;
 extern SDLTest_TestSuiteReference renderTestSuite;
 extern SDLTest_TestSuiteReference rwopsTestSuite;
 extern SDLTest_TestSuiteReference sdltestTestSuite;
 extern SDLTest_TestSuiteReference stdlibTestSuite;
+extern SDLTest_TestSuiteReference subsystemsTestSuite;
 extern SDLTest_TestSuiteReference surfaceTestSuite;
-extern SDLTest_TestSuiteReference syswmTestSuite;
 extern SDLTest_TestSuiteReference timerTestSuite;
 extern SDLTest_TestSuiteReference videoTestSuite;
 

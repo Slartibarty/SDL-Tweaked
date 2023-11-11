@@ -224,7 +224,7 @@ SDL_FunctionPointer WIN_GL_GetProcAddress(SDL_VideoDevice *_this, const char *pr
 
     /* This is to pick up extensions */
     func = _this->gl_data->wglGetProcAddress(proc);
-    if (func == NULL) {
+    if (!func) {
         /* This is probably a normal GL function */
         func = GetProcAddress(_this->gl_config.dll_handle, proc);
     }
@@ -386,7 +386,7 @@ static SDL_bool HasExtension(const char *extension, const char *extensions)
         return SDL_FALSE;
     }
 
-    if (extensions == NULL) {
+    if (!extensions) {
         return SDL_FALSE;
     }
 
@@ -398,7 +398,7 @@ static SDL_bool HasExtension(const char *extension, const char *extensions)
 
     for (;;) {
         where = SDL_strstr(start, extension);
-        if (where == NULL) {
+        if (!where) {
             break;
         }
 
@@ -841,9 +841,9 @@ int WIN_GL_MakeCurrent(SDL_VideoDevice *_this, SDL_Window *window, SDL_GLContext
        NULL, against spec. Since hdc is _supposed_ to be ignored if context
        is NULL, we either use the current GL window, or do nothing if we
        already have no current context. */
-    if (window == NULL) {
+    if (!window) {
         window = SDL_GL_GetCurrentWindow();
-        if (window == NULL) {
+        if (!window) {
             SDL_assert(SDL_GL_GetCurrentContext() == NULL);
             return 0; /* already done. */
         }
@@ -903,7 +903,6 @@ SDL_bool WIN_GL_SetPixelFormatFrom(SDL_VideoDevice *_this, SDL_Window *fromWindo
 {
     HDC hfromdc = fromWindow->driverdata->hdc;
     HDC htodc = toWindow->driverdata->hdc;
-    BOOL result;
 
     /* get the pixel format of the fromWindow */
     int pixel_format = GetPixelFormat(hfromdc);
@@ -912,9 +911,7 @@ SDL_bool WIN_GL_SetPixelFormatFrom(SDL_VideoDevice *_this, SDL_Window *fromWindo
     DescribePixelFormat(hfromdc, pixel_format, sizeof(pfd), &pfd);
 
     /* set the pixel format of the toWindow */
-    result = SetPixelFormat(htodc, pixel_format, &pfd);
-
-    return result ? SDL_TRUE : SDL_FALSE;
+    return SetPixelFormat(htodc, pixel_format, &pfd);
 }
 
 #endif /* SDL_VIDEO_OPENGL_WGL */

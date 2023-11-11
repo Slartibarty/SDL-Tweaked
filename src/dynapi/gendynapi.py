@@ -134,7 +134,13 @@ def main():
             # Discard if it doesn't contain 'SDLCALL'
             if "SDLCALL" not in func:
                 if args.debug:
-                    print("  Discard: " + func)
+                    print("  Discard, doesn't have SDLCALL: " + func)
+                continue
+
+            # Discard if it contains 'SDLMAIN_DECLSPEC' (these are not SDL symbols).
+            if "SDLMAIN_DECLSPEC" in func:
+                if args.debug:
+                    print("  Discard, has SDLMAIN_DECLSPEC: " + func)
                 continue
 
             if args.debug:
@@ -156,6 +162,7 @@ def main():
             func = re.sub(" SDL_TRY_ACQUIRE_SHARED\(.*\)", "", func);
             func = re.sub(" SDL_RELEASE\(.*\)", "", func);
             func = re.sub(" SDL_RELEASE_SHARED\(.*\)", "", func);
+            func = re.sub(" SDL_RELEASE_GENERIC\(.*\)", "", func);
 
             # Should be a valid function here
             match = reg_parsing_function.match(func)

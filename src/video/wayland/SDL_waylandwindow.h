@@ -27,8 +27,6 @@
 #include "../SDL_sysvideo.h"
 #include "../../events/SDL_touch_c.h"
 
-#include <SDL3/SDL_syswm.h>
-
 #include "SDL_waylandvideo.h"
 
 struct SDL_WaylandInput;
@@ -102,10 +100,6 @@ struct SDL_WindowData
 
     SDL_AtomicInt swap_interval_ready;
 
-#ifdef SDL_VIDEO_DRIVER_WAYLAND_QT_TOUCH
-    struct qt_extended_surface *extended_surface;
-#endif /* SDL_VIDEO_DRIVER_WAYLAND_QT_TOUCH */
-
     SDL_DisplayData **outputs;
     int num_outputs;
 
@@ -123,6 +117,7 @@ struct SDL_WindowData
     SDL_DisplayID last_displayID;
     SDL_bool floating;
     SDL_bool suspended;
+    SDL_bool active;
     SDL_bool is_fullscreen;
     SDL_bool in_fullscreen_transition;
     SDL_bool fullscreen_was_positioned;
@@ -154,7 +149,6 @@ extern void Wayland_ShowWindowSystemMenu(SDL_Window *window, int x, int y);
 extern void Wayland_DestroyWindow(SDL_VideoDevice *_this, SDL_Window *window);
 extern int Wayland_SuspendScreenSaver(SDL_VideoDevice *_this);
 
-extern int Wayland_GetWindowWMInfo(SDL_VideoDevice *_this, SDL_Window *window, SDL_SysWMinfo *info);
 extern int Wayland_SetWindowHitTest(SDL_Window *window, SDL_bool enabled);
 extern int Wayland_FlashWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_FlashOperation operation);
 
