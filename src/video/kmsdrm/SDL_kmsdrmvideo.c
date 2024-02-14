@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -23,11 +23,14 @@
 
 #ifdef SDL_VIDEO_DRIVER_KMSDRM
 
+/* include this here before SDL_sysvideo.h to avoid vulkan type
+ * redefinition errors.  it already includes SDL_sysvideo.h.  */
+#include "SDL_kmsdrmvulkan.h"
+
 /* SDL internals */
 #include "../../events/SDL_events_c.h"
 #include "../../events/SDL_keyboard_c.h"
 #include "../../events/SDL_mouse_c.h"
-#include "../SDL_sysvideo.h"
 
 #ifdef SDL_INPUT_LINUXEV
 #include "../../core/linux/SDL_evdev.h"
@@ -41,7 +44,6 @@
 #include "SDL_kmsdrmmouse.h"
 #include "SDL_kmsdrmvideo.h"
 #include "SDL_kmsdrmopengles.h"
-#include "SDL_kmsdrmvulkan.h"
 #include <dirent.h>
 #include <errno.h>
 #include <poll.h>
@@ -49,7 +51,7 @@
 #include <sys/stat.h>
 #include <sys/utsname.h>
 
-#ifdef __OpenBSD__
+#ifdef SDL_PLATFORM_OPENBSD
 static SDL_bool moderndri = SDL_FALSE;
 #else
 static SDL_bool moderndri = SDL_TRUE;
@@ -191,13 +193,13 @@ static float CalculateRefreshRate(drmModeModeInfo *mode)
 
 static int KMSDRM_Available(void)
 {
-#ifdef __OpenBSD__
+#ifdef SDL_PLATFORM_OPENBSD
     struct utsname nameofsystem;
     double releaseversion;
 #endif
     int ret = -ENOENT;
 
-#ifdef __OpenBSD__
+#ifdef SDL_PLATFORM_OPENBSD
     if (!(uname(&nameofsystem) < 0)) {
         releaseversion = SDL_atof(nameofsystem.release);
         if (releaseversion >= 6.9) {
@@ -261,13 +263,11 @@ static SDL_VideoDevice *KMSDRM_CreateDevice(void)
 
     device = (SDL_VideoDevice *)SDL_calloc(1, sizeof(SDL_VideoDevice));
     if (!device) {
-        SDL_OutOfMemory();
         return NULL;
     }
 
     viddata = (SDL_VideoData *)SDL_calloc(1, sizeof(SDL_VideoData));
     if (!viddata) {
-        SDL_OutOfMemory();
         goto cleanup;
     }
     viddata->devindex = devindex;
@@ -281,7 +281,6 @@ static SDL_VideoDevice *KMSDRM_CreateDevice(void)
     device->GetDisplayModes = KMSDRM_GetDisplayModes;
     device->SetDisplayMode = KMSDRM_SetDisplayMode;
     device->CreateSDLWindow = KMSDRM_CreateWindow;
-    device->CreateSDLWindowFrom = KMSDRM_CreateWindowFrom;
     device->SetWindowTitle = KMSDRM_SetWindowTitle;
     device->SetWindowPosition = KMSDRM_SetWindowPosition;
     device->SetWindowSize = KMSDRM_SetWindowSize;
@@ -329,9 +328,10 @@ cleanup:
 }
 
 VideoBootStrap KMSDRM_bootstrap = {
-    "KMSDRM",
+    "kmsdrm",
     "KMS/DRM Video Driver",
-    KMSDRM_CreateDevice
+    KMSDRM_CreateDevice,
+    NULL /* no ShowMessageBox implementation */
 };
 
 static void KMSDRM_FBDestroyCallback(struct gbm_bo *bo, void *data)
@@ -365,7 +365,6 @@ KMSDRM_FBInfo *KMSDRM_FBFromBO(SDL_VideoDevice *_this, struct gbm_bo *bo)
     fb_info = (KMSDRM_FBInfo *)SDL_calloc(1, sizeof(KMSDRM_FBInfo));
 
     if (!fb_info) {
-        SDL_OutOfMemory();
         return NULL;
     }
 
@@ -690,7 +689,7 @@ static void KMSDRM_AddDisplay(SDL_VideoDevice *_this, drmModeConnector *connecto
     /* Reserve memory for the new display's driverdata. */
     dispdata = (SDL_DisplayData *)SDL_calloc(1, sizeof(SDL_DisplayData));
     if (!dispdata) {
-        ret = SDL_OutOfMemory();
+        ret = -1;
         goto cleanup;
     }
 
@@ -853,7 +852,7 @@ static void KMSDRM_AddDisplay(SDL_VideoDevice *_this, drmModeConnector *connecto
     modedata = SDL_calloc(1, sizeof(SDL_DisplayModeData));
 
     if (!modedata) {
-        ret = SDL_OutOfMemory();
+        ret = -1;
         goto cleanup;
     }
 
@@ -1223,6 +1222,7 @@ cleanup:
     return ret;
 }
 
+#ifdef SDL_INPUT_LINUXEV
 static void KMSDRM_ReleaseVT(void *userdata)
 {
     SDL_VideoDevice *_this = (SDL_VideoDevice *)userdata;
@@ -1252,6 +1252,7 @@ static void KMSDRM_AcquireVT(void *userdata)
         }
     }
 }
+#endif /* defined SDL_INPUT_LINUXEV */
 
 int KMSDRM_VideoInit(SDL_VideoDevice *_this)
 {
@@ -1444,7 +1445,7 @@ void KMSDRM_DestroyWindow(SDL_VideoDevice *_this, SDL_Window *window)
 /* reflect it: if it's fullscreen, KMSDRM_SetWindwoFullscreen() will  */
 /* be called by SDL later, and we can manage it there.                */
 /**********************************************************************/
-int KMSDRM_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window)
+int KMSDRM_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_PropertiesID create_props)
 {
     SDL_WindowData *windata = NULL;
     SDL_VideoData *viddata = _this->driverdata;
@@ -1459,7 +1460,7 @@ int KMSDRM_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window)
     /* Allocate window internal data */
     windata = (SDL_WindowData *)SDL_calloc(1, sizeof(SDL_WindowData));
     if (!windata) {
-        return SDL_OutOfMemory();
+        return -1;
     }
 
     /* Setup driver data for this window */
@@ -1467,9 +1468,9 @@ int KMSDRM_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window)
     window->driverdata = windata;
 
     SDL_PropertiesID props = SDL_GetWindowProperties(window);
-    SDL_SetProperty(props, "SDL.window.kmsdrm.dev_index", (void *)(intptr_t)viddata->devindex);
-    SDL_SetProperty(props, "SDL.window.kmsdrm.drm_fd", (void *)(intptr_t)viddata->drm_fd);
-    SDL_SetProperty(props, "SDL.window.kmsdrm.gbm_dev", viddata->gbm_dev);
+    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_KMSDRM_DEVICE_INDEX_NUMBER, viddata->devindex);
+    SDL_SetNumberProperty(props, SDL_PROP_WINDOW_KMSDRM_DRM_FD_NUMBER, viddata->drm_fd);
+    SDL_SetProperty(props, SDL_PROP_WINDOW_KMSDRM_GBM_DEVICE_POINTER, viddata->gbm_dev);
 
     if (!is_vulkan && !vulkan_mode) { /* NON-Vulkan block. */
 
@@ -1558,7 +1559,7 @@ int KMSDRM_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window)
         SDL_Window **new_windows = (SDL_Window **)SDL_realloc(viddata->windows,
                                                               new_max_windows * sizeof(SDL_Window *));
         if (!new_windows) {
-            return SDL_OutOfMemory();
+            return -1;
         }
         viddata->windows = new_windows;
         viddata->max_windows = new_max_windows;
@@ -1584,11 +1585,6 @@ int KMSDRM_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window)
     return ret;
 }
 
-int KMSDRM_CreateWindowFrom(SDL_VideoDevice *_this, SDL_Window *window, const void *data)
-{
-    return -1;
-}
-
 void KMSDRM_SetWindowTitle(SDL_VideoDevice *_this, SDL_Window *window)
 {
 }
@@ -1603,13 +1599,13 @@ void KMSDRM_SetWindowSize(SDL_VideoDevice *_this, SDL_Window *window)
         KMSDRM_DirtySurfaces(window);
     }
 }
-void KMSDRM_SetWindowFullscreen(SDL_VideoDevice *_this, SDL_Window *window, SDL_VideoDisplay *display, SDL_bool fullscreen)
-
+int KMSDRM_SetWindowFullscreen(SDL_VideoDevice *_this, SDL_Window *window, SDL_VideoDisplay *display, SDL_bool fullscreen)
 {
     SDL_VideoData *viddata = _this->driverdata;
     if (!viddata->vulkan_mode) {
         KMSDRM_DirtySurfaces(window);
     }
+    return 0;
 }
 void KMSDRM_ShowWindow(SDL_VideoDevice *_this, SDL_Window *window)
 {

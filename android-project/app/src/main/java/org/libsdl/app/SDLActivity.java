@@ -180,6 +180,14 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
     private static final int SDL_SYSTEM_CURSOR_SIZEALL = 9;
     private static final int SDL_SYSTEM_CURSOR_NO = 10;
     private static final int SDL_SYSTEM_CURSOR_HAND = 11;
+    private static final int SDL_SYSTEM_CURSOR_WINDOW_TOPLEFT = 12;
+    private static final int SDL_SYSTEM_CURSOR_WINDOW_TOP = 13;
+    private static final int SDL_SYSTEM_CURSOR_WINDOW_TOPRIGHT = 14;
+    private static final int SDL_SYSTEM_CURSOR_WINDOW_RIGHT = 15;
+    private static final int SDL_SYSTEM_CURSOR_WINDOW_BOTTOMRIGHT = 16;
+    private static final int SDL_SYSTEM_CURSOR_WINDOW_BOTTOM = 17;
+    private static final int SDL_SYSTEM_CURSOR_WINDOW_BOTTOMLEFT = 18;
+    private static final int SDL_SYSTEM_CURSOR_WINDOW_LEFT = 19;
 
     protected static final int SDL_ORIENTATION_UNKNOWN = 0;
     protected static final int SDL_ORIENTATION_LANDSCAPE = 1;
@@ -675,11 +683,11 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
 
             // Wait for "SDLThread" thread to end
             try {
-                // 500ms timeout, because:
+                // Use a timeout because:
                 // C SDLmain() thread might have started (mSDLThread.start() called)
                 // while the SDL_Init() might not have been called yet,
                 // and so the previous QUIT event will be discarded by SDL_Init() and app is running, not exiting.
-                SDLActivity.mSDLThread.join(500);
+                SDLActivity.mSDLThread.join(1000);
             } catch(Exception e) {
                 Log.v(TAG, "Problem stopping SDLThread: " + e);
             }
@@ -780,7 +788,7 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
 
         // Try a transition to resumed state
         if (mNextNativeState == NativeState.RESUMED) {
-            if (mSurface.mIsSurfaceReady && mHasFocus && mIsResumedCalled) {
+            if (mSurface.mIsSurfaceReady && (mHasFocus || mHasMultiWindow) && mIsResumedCalled) {
                 if (mSDLThread == null) {
                     // This is the entry point to the C app.
                     // Start up the C app thread and enable sensor input for the first time
@@ -802,11 +810,10 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
     }
 
     // Messages from the SDLMain thread
-    static final int COMMAND_CHANGE_TITLE = 1;
-    static final int COMMAND_CHANGE_WINDOW_STYLE = 2;
-    static final int COMMAND_TEXTEDIT_HIDE = 3;
-    static final int COMMAND_SET_KEEP_SCREEN_ON = 5;
-
+    protected static final int COMMAND_CHANGE_TITLE = 1;
+    protected static final int COMMAND_CHANGE_WINDOW_STYLE = 2;
+    protected static final int COMMAND_TEXTEDIT_HIDE = 3;
+    protected static final int COMMAND_SET_KEEP_SCREEN_ON = 5;
     protected static final int COMMAND_USER = 0x8000;
 
     protected static boolean mFullscreenModeActive;
@@ -914,7 +921,7 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
     Handler commandHandler = new SDLCommandHandler();
 
     // Send a message from the SDLMain thread
-    boolean sendCommand(int command, Object data) {
+    protected boolean sendCommand(int command, Object data) {
         Message msg = commandHandler.obtainMessage();
         msg.arg1 = command;
         msg.obj = data;
@@ -1126,23 +1133,6 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
      * This method is called by SDL using JNI.
      */
     public static boolean shouldMinimizeOnFocusLoss() {
-/*
-        if (Build.VERSION.SDK_INT >= 24) {
-            if (mSingleton == null) {
-                return true;
-            }
-
-            if (mSingleton.isInMultiWindowMode()) {
-                return false;
-            }
-
-            if (mSingleton.isInPictureInPictureMode()) {
-                return false;
-            }
-        }
-
-        return true;
-*/
         return false;
     }
 
@@ -1475,17 +1465,7 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
             if (device != null && ((device.getSources() & InputDevice.SOURCE_TOUCHSCREEN) == InputDevice.SOURCE_TOUCHSCREEN
                     || device.isVirtual())) {
 
-                int touchDevId = device.getId();
-                /*
-                 * Prevent id to be -1, since it's used in SDL internal for synthetic events
-                 * Appears when using Android emulator, eg:
-                 *  adb shell input mouse tap 100 100
-                 *  adb shell input touchscreen tap 100 100
-                 */
-                if (touchDevId < 0) {
-                    touchDevId -= 1;
-                }
-                nativeAddTouch(touchDevId, device.getName());
+                nativeAddTouch(device.getId(), device.getName());
             }
         }
     }
@@ -1831,6 +1811,30 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
         case SDL_SYSTEM_CURSOR_HAND:
             cursor_type = 1002; //PointerIcon.TYPE_HAND;
             break;
+        case SDL_SYSTEM_CURSOR_WINDOW_TOPLEFT:
+            cursor_type = 1017; //PointerIcon.TYPE_TOP_LEFT_DIAGONAL_DOUBLE_ARROW;
+            break;
+        case SDL_SYSTEM_CURSOR_WINDOW_TOP:
+            cursor_type = 1015; //PointerIcon.TYPE_VERTICAL_DOUBLE_ARROW;
+            break;
+        case SDL_SYSTEM_CURSOR_WINDOW_TOPRIGHT:
+            cursor_type = 1016; //PointerIcon.TYPE_TOP_RIGHT_DIAGONAL_DOUBLE_ARROW;
+            break;
+        case SDL_SYSTEM_CURSOR_WINDOW_RIGHT:
+            cursor_type = 1014; //PointerIcon.TYPE_HORIZONTAL_DOUBLE_ARROW;
+            break;
+        case SDL_SYSTEM_CURSOR_WINDOW_BOTTOMRIGHT:
+            cursor_type = 1017; //PointerIcon.TYPE_TOP_LEFT_DIAGONAL_DOUBLE_ARROW;
+            break;
+        case SDL_SYSTEM_CURSOR_WINDOW_BOTTOM:
+            cursor_type = 1015; //PointerIcon.TYPE_VERTICAL_DOUBLE_ARROW;
+            break;
+        case SDL_SYSTEM_CURSOR_WINDOW_BOTTOMLEFT:
+            cursor_type = 1016; //PointerIcon.TYPE_TOP_RIGHT_DIAGONAL_DOUBLE_ARROW;
+            break;
+        case SDL_SYSTEM_CURSOR_WINDOW_LEFT:
+            cursor_type = 1014; //PointerIcon.TYPE_HORIZONTAL_DOUBLE_ARROW;
+            break;
         }
         if (Build.VERSION.SDK_INT >= 24 /* Android 7.0 (N) */) {
             try {
@@ -1901,11 +1905,11 @@ public class SDLActivity extends Activity implements View.OnSystemUiVisibilityCh
         try
         {
             class OneShotTask implements Runnable {
-                String mMessage;
-                int mDuration;
-                int mGravity;
-                int mXOffset;
-                int mYOffset;
+                private final String mMessage;
+                private final int mDuration;
+                private final int mGravity;
+                private final int mXOffset;
+                private final int mYOffset;
 
                 OneShotTask(String message, int duration, int gravity, int xOffset, int yOffset) {
                     mMessage  = message;

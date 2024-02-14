@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -24,7 +24,7 @@
 #ifndef _INCLUDED_WINDOWS_H
 #define _INCLUDED_WINDOWS_H
 
-#ifdef __WIN32__
+#ifdef SDL_PLATFORM_WIN32
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN 1
 #endif
@@ -45,7 +45,7 @@
 #endif
 #define WINVER _WIN32_WINNT
 
-#elif defined(__WINGDK__)
+#elif defined(SDL_PLATFORM_WINGDK)
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN 1
 #endif
@@ -60,7 +60,7 @@
 #define _WIN32_WINNT 0xA00
 #define WINVER       _WIN32_WINNT
 
-#elif defined(__XBOXONE__) || defined(__XBOXSERIES__)
+#elif defined(SDL_PLATFORM_XBOXONE) || defined(SDL_PLATFORM_XBOXSERIES)
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN 1
 #endif
@@ -132,9 +132,9 @@ extern int WIN_SetErrorFromHRESULT(const char *prefix, HRESULT hr);
 /* Sets an error message based on GetLastError(). Always return -1. */
 extern int WIN_SetError(const char *prefix);
 
-#ifndef __WINRT__
+#ifndef SDL_PLATFORM_WINRT
 /* Load a function from combase.dll */
-void *WIN_LoadComBaseFunction(const char *name);
+FARPROC WIN_LoadComBaseFunction(const char *name);
 #endif
 
 /* Wrap up the oddities of CoInitialize() into a common function. */
@@ -144,6 +144,9 @@ extern void WIN_CoUninitialize(void);
 /* Wrap up the oddities of RoInitialize() into a common function. */
 extern HRESULT WIN_RoInitialize(void);
 extern void WIN_RoUninitialize(void);
+
+/* Returns SDL_TRUE if we're running on Windows XP (any service pack). DOES NOT CHECK XP "OR GREATER"! */
+extern BOOL WIN_IsWindowsXP(void);
 
 /* Returns SDL_TRUE if we're running on Windows Vista and newer */
 extern BOOL WIN_IsWindowsVistaOrGreater(void);
@@ -169,6 +172,9 @@ extern void WIN_RectToRECT(const SDL_Rect *sdlrect, RECT *winrect);
 extern BOOL WIN_IsRectEmpty(const RECT *rect);
 
 extern SDL_AudioFormat SDL_WaveFormatExToSDLFormat(WAVEFORMATEX *waveformat);
+
+/* WideCharToMultiByte, but with some WinXP manangement. */
+extern int WIN_WideCharToMultiByte(UINT CodePage, DWORD dwFlags, LPCWCH lpWideCharStr, int cchWideChar, LPSTR lpMultiByteStr, int cbMultiByte, LPCCH lpDefaultChar, LPBOOL lpUsedDefaultChar);
 
 /* Ends C function definitions when using C++ */
 #ifdef __cplusplus

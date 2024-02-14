@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -97,7 +97,7 @@ int SDL_SetClipboardData(SDL_ClipboardDataCallback callback, SDL_ClipboardCleanu
         }
         if (num_allocated < num_mime_types) {
             SDL_ClearClipboardData();
-            return SDL_OutOfMemory();
+            return -1;
         }
         _this->num_clipboard_mime_types = num_mime_types;
     }
@@ -156,8 +156,6 @@ void *SDL_GetInternalClipboardData(SDL_VideoDevice *_this, const char *mime_type
             if (data) {
                 SDL_memcpy(data, provided_data, *size);
                 SDL_memset((Uint8 *)data + *size, 0, sizeof(Uint32));
-            } else {
-                SDL_OutOfMemory();
             }
         }
     }
@@ -255,7 +253,7 @@ static const char **SDL_GetTextMimeTypes(SDL_VideoDevice *_this, size_t *num_mim
     }
 }
 
-const void *SDL_ClipboardTextCallback(void *userdata, const char *mime_type, size_t *size)
+const void * SDLCALL SDL_ClipboardTextCallback(void *userdata, const char *mime_type, size_t *size)
 {
     char *text = (char *)userdata;
     if (text) {
@@ -280,9 +278,8 @@ int SDL_SetClipboardText(const char *text)
         text_mime_types = SDL_GetTextMimeTypes(_this, &num_mime_types);
 
         return SDL_SetClipboardData(SDL_ClipboardTextCallback, SDL_free, SDL_strdup(text), text_mime_types, num_mime_types);
-    } else {
-        return SDL_ClearClipboardData();
     }
+    return SDL_ClearClipboardData();
 }
 
 char *SDL_GetClipboardText(void)

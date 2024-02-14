@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -26,7 +26,7 @@
    The code in SDL_wasapi.c is used by both standard Windows and WinRT builds
    to deal with audio and calls into these functions. */
 
-#if defined(SDL_AUDIO_DRIVER_WASAPI) && !defined(__WINRT__)
+#if defined(SDL_AUDIO_DRIVER_WASAPI) && !defined(SDL_PLATFORM_WINRT)
 
 #include "../../core/windows/SDL_windows.h"
 #include "../../core/windows/SDL_immdevice.h"
@@ -50,26 +50,36 @@ static const IID SDL_IID_IAudioClient = { 0x1cb9ad4c, 0xdbfa, 0x4c32, { 0xb1, 0x
 
 static int mgmtthrtask_AudioDeviceDisconnected(void *userdata)
 {
-    SDL_AudioDeviceDisconnected((SDL_AudioDevice *)userdata);
+    SDL_AudioDevice *device = (SDL_AudioDevice *) userdata;
+    SDL_AudioDeviceDisconnected(device);
+    UnrefPhysicalAudioDevice(device);  // make sure this lived until the task completes.
     return 0;
 }
 
 static void WASAPI_AudioDeviceDisconnected(SDL_AudioDevice *device)
 {
     // don't wait on this, IMMDevice's own thread needs to return or everything will deadlock.
-    WASAPI_ProxyToManagementThread(mgmtthrtask_AudioDeviceDisconnected, device, NULL);
+    if (device) {
+        RefPhysicalAudioDevice(device);  // make sure this lives until the task completes.
+        WASAPI_ProxyToManagementThread(mgmtthrtask_AudioDeviceDisconnected, device, NULL);
+    }
 }
 
 static int mgmtthrtask_DefaultAudioDeviceChanged(void *userdata)
 {
-    SDL_DefaultAudioDeviceChanged((SDL_AudioDevice *) userdata);
+    SDL_AudioDevice *device = (SDL_AudioDevice *) userdata;
+    SDL_DefaultAudioDeviceChanged(device);
+    UnrefPhysicalAudioDevice(device);  // make sure this lived until the task completes.
     return 0;
 }
 
 static void WASAPI_DefaultAudioDeviceChanged(SDL_AudioDevice *new_default_device)
 {
     // don't wait on this, IMMDevice's own thread needs to return or everything will deadlock.
-    WASAPI_ProxyToManagementThread(mgmtthrtask_DefaultAudioDeviceChanged, new_default_device, NULL);
+    if (new_default_device) {
+        RefPhysicalAudioDevice(new_default_device);  // make sure this lives until the task completes.
+        WASAPI_ProxyToManagementThread(mgmtthrtask_DefaultAudioDeviceChanged, new_default_device, NULL);
+    }
 }
 
 int WASAPI_PlatformInit(void)
@@ -192,4 +202,4 @@ void WASAPI_PlatformFreeDeviceHandle(SDL_AudioDevice *device)
     SDL_IMMDevice_FreeDeviceHandle(device);
 }
 
-#endif // SDL_AUDIO_DRIVER_WASAPI && !defined(__WINRT__)
+#endif // SDL_AUDIO_DRIVER_WASAPI && !defined(SDL_PLATFORM_WINRT)

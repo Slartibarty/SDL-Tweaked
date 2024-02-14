@@ -105,6 +105,9 @@
     <ClInclude Include="..\include\SDL3\SDL_opengles2.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\include\SDL3\SDL_pen.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
     <ClInclude Include="..\include\SDL3\SDL_pixels.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -133,9 +136,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\SDL3\SDL_scancode.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\include\SDL3\SDL_shape.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\include\SDL3\SDL_stdinc.h">
@@ -259,6 +259,9 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="..\src\joystick\SDL_joystick_c.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\src\joystick\SDL_steam_virtual_gamepad.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="..\src\joystick\SDL_sysjoystick.h">
@@ -402,9 +405,6 @@
     <ClInclude Include="..\src\video\SDL_RLEaccel_c.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\src\video\SDL_shape_internals.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
     <ClInclude Include="..\src\video\SDL_sysvideo.h">
       <Filter>Source Files</Filter>
     </ClInclude>
@@ -433,9 +433,6 @@
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="..\src\SDL_list.h">
-      <Filter>Source Files</Filter>
-    </ClInclude>
-    <ClInclude Include="..\src\haptic\windows\SDL_xinputhaptic_c.h">
       <Filter>Source Files</Filter>
     </ClInclude>
     <ClInclude Include="..\src\haptic\windows\SDL_dinputhaptic_c.h">
@@ -552,6 +549,9 @@
     <ClCompile Include="..\src\events\SDL_mouse.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\events\SDL_pen.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\src\events\SDL_quit.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -583,6 +583,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\joystick\SDL_joystick.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\joystick\SDL_steam_virtual_gamepad.c">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\src\joystick\virtual\SDL_virtualjoystick.c">
@@ -711,6 +714,15 @@
     <ClCompile Include="..\src\stdlib\SDL_malloc.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\src\stdlib\SDL_memcpy.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\stdlib\SDL_memmove.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\src\stdlib\SDL_memset.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
     <ClCompile Include="..\src\stdlib\SDL_qsort.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -801,9 +813,6 @@
     <ClCompile Include="..\src\video\SDL_RLEaccel.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\video\SDL_shape.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\video\SDL_stretch.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -852,9 +861,6 @@
     <ClCompile Include="..\src\haptic\windows\SDL_windowshaptic.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\src\haptic\windows\SDL_xinputhaptic.c">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\src\video\SDL_yuv.c">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -896,7 +902,7 @@
     <ClCompile Include="..\src\stdlib\SDL_mslibc.c">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <MASM Include="..\src\stdlib\SDL_mslibc_x64.asm">
+    <MASM Include="..\src\stdlib\SDL_mslibc_x64.masm">
       <Filter>stdlib</Filter>
     </MASM>
     <ClCompile Include="..\src\core\windows\pch.c">

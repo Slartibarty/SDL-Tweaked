@@ -32,7 +32,7 @@ Andreas Schiffler -- aschiffler at ferzkopp dot net
 
 #if SDL_VIDEO_RENDER_SW && !defined(SDL_RENDER_DISABLED)
 
-#if defined(__WIN32__) || defined(__GDK__)
+#if defined(SDL_PLATFORM_WIN32) || defined(SDL_PLATFORM_GDK)
 #include "../../core/windows/SDL_windows.h"
 #endif
 
@@ -296,8 +296,8 @@ static void transformSurfaceRGBA(SDL_Surface *src, SDL_Surface *dst, int isin, i
         int y;
         for (y = 0; y < dst->h; y++) {
             int x;
-            double src_x = (rect_dest->x + 0 + 0.5 - center->x);
-            double src_y = (rect_dest->y + y + 0.5 - center->y);
+            double src_x = ((double)rect_dest->x + 0 + 0.5 - center->x);
+            double src_y = ((double)rect_dest->y + y + 0.5 - center->y);
             int sdx = (int)((icos * src_x - isin * src_y) + cx - fp_half);
             int sdy = (int)((isin * src_x + icos * src_y) + cy - fp_half);
             for (x = 0; x < dst->w; x++) {
@@ -364,8 +364,8 @@ static void transformSurfaceRGBA(SDL_Surface *src, SDL_Surface *dst, int isin, i
         int y;
         for (y = 0; y < dst->h; y++) {
             int x;
-            double src_x = (rect_dest->x + 0 + 0.5 - center->x);
-            double src_y = (rect_dest->y + y + 0.5 - center->y);
+            double src_x = ((double)rect_dest->x + 0 + 0.5 - center->x);
+            double src_y = ((double)rect_dest->y + y + 0.5 - center->y);
             int sdx = (int)((icos * src_x - isin * src_y) + cx - fp_half);
             int sdy = (int)((isin * src_x + icos * src_y) + cy - fp_half);
             for (x = 0; x < dst->w; x++) {
@@ -437,8 +437,8 @@ static void transformSurfaceY(SDL_Surface *src, SDL_Surface *dst, int isin, int 
      */
     for (y = 0; y < dst->h; y++) {
         int x;
-        double src_x = (rect_dest->x + 0 + 0.5 - center->x);
-        double src_y = (rect_dest->y + y + 0.5 - center->y);
+        double src_x = ((double)rect_dest->x + 0 + 0.5 - center->x);
+        double src_y = ((double)rect_dest->y + y + 0.5 - center->y);
         int sdx = (int)((icos * src_x - isin * src_y) + cx - fp_half);
         int sdy = (int)((isin * src_x + icos * src_y) + cy - fp_half);
         for (x = 0; x < dst->w; x++) {
@@ -508,8 +508,8 @@ SDL_Surface *SDLgfx_rotateSurface(SDL_Surface *src, double angle, int smooth, in
         }
     }
     /* This function requires a 32-bit surface or 8-bit surface with a colorkey */
-    is8bit = src->format->BitsPerPixel == 8 && colorKeyAvailable;
-    if (!(is8bit || (src->format->BitsPerPixel == 32 && src->format->Amask))) {
+    is8bit = src->format->bits_per_pixel == 8 && colorKeyAvailable;
+    if (!(is8bit || (src->format->bits_per_pixel == 32 && src->format->Amask))) {
         return NULL;
     }
 

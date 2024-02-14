@@ -294,6 +294,9 @@
     <ClInclude Include="..\..\include\SDL3\SDL_opengles2_khrplatform.h">
       <Filter>API Headers</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\include\SDL3\SDL_pen.h">
+      <Filter>API Headers</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\include\SDL3\SDL_pixels.h">
       <Filter>API Headers</Filter>
     </ClInclude>
@@ -328,9 +331,6 @@
       <Filter>API Headers</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\SDL3\SDL_sensor.h">
-      <Filter>API Headers</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\include\SDL3\SDL_shape.h">
       <Filter>API Headers</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\SDL3\SDL_stdinc.h">
@@ -501,6 +501,9 @@
     <ClInclude Include="..\..\src\joystick\SDL_joystick_c.h">
       <Filter>joystick</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\src\joystick\SDL_steam_virtual_gamepad.h">
+      <Filter>joystick</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\src\joystick\SDL_sysjoystick.h">
       <Filter>joystick</Filter>
     </ClInclude>
@@ -541,9 +544,6 @@
       <Filter>haptic\windows</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\haptic\windows\SDL_windowshaptic_c.h">
-      <Filter>haptic\windows</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\haptic\windows\SDL_xinputhaptic_c.h">
       <Filter>haptic\windows</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\joystick\hidapi\SDL_hidapijoystick_c.h">
@@ -591,9 +591,6 @@
     <ClInclude Include="..\..\src\video\SDL_rect_c.h">
       <Filter>video</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\src\video\SDL_shape_internals.h">
-      <Filter>video</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\src\video\SDL_sysvideo.h">
       <Filter>video</Filter>
     </ClInclude>
@@ -623,9 +620,6 @@
     </ClInclude>
     <ClInclude Include="..\..\src\video\yuv2rgb\yuv_rgb_std_func.h">
       <Filter>video\yuv2rgb</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\src\video\windows\SDL_vkeys.h">
-      <Filter>video\windows</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\video\windows\SDL_windowsclipboard.h">
       <Filter>video\windows</Filter>
@@ -831,6 +825,13 @@
       <Filter>render\direct3d12</Filter>
     </ClInclude>
     <ClInclude Include="..\..\src\hidapi\SDL_hidapi_c.h" />
+    <ClInclude Include="..\..\src\thread\generic\SDL_sysrwlock_c.h" />
+    <ClInclude Include="..\..\src\video\yuv2rgb\yuv_rgb_common.h" />
+    <ClInclude Include="..\..\src\video\yuv2rgb\yuv_rgb_internal.h" />
+    <ClInclude Include="..\..\src\video\yuv2rgb\yuv_rgb_lsx.h" />
+    <ClInclude Include="..\..\src\video\yuv2rgb\yuv_rgb_lsx_func.h" />
+    <ClInclude Include="..\..\src\video\yuv2rgb\yuv_rgb_sse.h" />
+    <ClInclude Include="..\..\src\video\yuv2rgb\yuv_rgb_std.h" />
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\src\audio\wasapi\SDL_wasapi.c" />
@@ -921,6 +922,9 @@
     <ClCompile Include="..\..\src\events\SDL_mouse.c">
       <Filter>events</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\src\events\SDL_pen.c">
+      <Filter>events</Filter>
+    </ClCompile>
     <ClCompile Include="..\..\src\events\SDL_quit.c">
       <Filter>events</Filter>
     </ClCompile>
@@ -949,6 +953,9 @@
       <Filter>joystick</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\joystick\SDL_joystick.c">
+      <Filter>joystick</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\joystick\SDL_steam_virtual_gamepad.c">
       <Filter>joystick</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\libm\e_atan2.c">
@@ -1050,9 +1057,6 @@
     <ClCompile Include="..\..\src\haptic\windows\SDL_windowshaptic.c">
       <Filter>haptic\windows</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\haptic\windows\SDL_xinputhaptic.c">
-      <Filter>haptic\windows</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\haptic\dummy\SDL_syshaptic.c">
       <Filter>haptic\dummy</Filter>
     </ClCompile>
@@ -1087,6 +1091,9 @@
       <Filter>joystick\hidapi</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\joystick\hidapi\SDL_hidapi_steam.c">
+      <Filter>joystick\hidapi</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\joystick\hidapi\SDL_hidapi_steamdeck.c">
       <Filter>joystick\hidapi</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\joystick\hidapi\SDL_hidapi_switch.c">
@@ -1170,9 +1177,6 @@
     <ClCompile Include="..\..\src\video\SDL_rect.c">
       <Filter>video</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\video\SDL_shape.c">
-      <Filter>video</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\src\video\SDL_stretch.c">
       <Filter>video</Filter>
     </ClCompile>
@@ -1202,9 +1206,6 @@
     </ClCompile>
     <ClCompile Include="..\..\src\video\dummy\SDL_nullvideo.c">
       <Filter>video\dummy</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\src\video\yuv2rgb\yuv_rgb.c">
-      <Filter>video\yuv2rgb</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\video\windows\SDL_windowsclipboard.c">
       <Filter>video\windows</Filter>
@@ -1288,6 +1289,15 @@
       <Filter>stdlib</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\stdlib\SDL_malloc.c">
+      <Filter>stdlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\stdlib\SDL_memcpy.c">
+      <Filter>stdlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\stdlib\SDL_memmove.c">
+      <Filter>stdlib</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\src\stdlib\SDL_memset.c">
       <Filter>stdlib</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\stdlib\SDL_qsort.c">
@@ -1390,9 +1400,10 @@
     <ClCompile Include="..\..\src\stdlib\SDL_mslibc.c">
       <Filter>stdlib</Filter>
     </ClCompile>
-    <MASM Include="..\..\src\stdlib\SDL_mslibc_x64.asm">
-      <Filter>stdlib</Filter>
-    </MASM>
+    <ClCompile Include="..\..\src\thread\generic\SDL_sysrwlock.c" />
+    <ClCompile Include="..\..\src\video\yuv2rgb\yuv_rgb_lsx.c" />
+    <ClCompile Include="..\..\src\video\yuv2rgb\yuv_rgb_sse.c" />
+    <ClCompile Include="..\..\src\video\yuv2rgb\yuv_rgb_std.c" />
   </ItemGroup>
   <ItemGroup>
     <ResourceCompile Include="..\..\src\core\windows\version.rc" />

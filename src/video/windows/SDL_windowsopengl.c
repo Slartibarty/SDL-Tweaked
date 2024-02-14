@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -95,7 +95,7 @@ typedef HGLRC(APIENTRYP PFNWGLCREATECONTEXTATTRIBSARBPROC)(HDC hDC,
                                                            const int
                                                                *attribList);
 
-#if defined(__XBOXONE__) || defined(__XBOXSERIES__)
+#if defined(SDL_PLATFORM_XBOXONE) || defined(SDL_PLATFORM_XBOXSERIES)
 #define GetDC(hwnd)          (HDC) hwnd
 #define ReleaseDC(hwnd, hdc) 1
 #define DescribePixelFormat  _this->gl_data->wglDescribePixelFormat
@@ -127,7 +127,7 @@ int WIN_GL_LoadLibrary(SDL_VideoDevice *_this, const char *path)
     /* Allocate OpenGL memory */
     _this->gl_data = (struct SDL_GLDriverData *)SDL_calloc(1, sizeof(struct SDL_GLDriverData));
     if (!_this->gl_data) {
-        return SDL_OutOfMemory();
+        return -1;
     }
 
     /* Load function pointers */
@@ -149,7 +149,7 @@ int WIN_GL_LoadLibrary(SDL_VideoDevice *_this, const char *path)
     _this->gl_data->wglSwapBuffers = (BOOL(WINAPI *)(HDC))
         SDL_LoadFunction(handle, "wglSwapBuffers");
 #endif
-#if defined(__XBOXONE__) || defined(__XBOXSERIES__)
+#if defined(SDL_PLATFORM_XBOXONE) || defined(SDL_PLATFORM_XBOXSERIES)
     _this->gl_data->wglDescribePixelFormat = (int(WINAPI *)(HDC, int, UINT, LPPIXELFORMATDESCRIPTOR))
         SDL_LoadFunction(handle, "wglDescribePixelFormat");
     _this->gl_data->wglChoosePixelFormat = (int(WINAPI *)(HDC, const PIXELFORMATDESCRIPTOR *))
@@ -167,8 +167,8 @@ int WIN_GL_LoadLibrary(SDL_VideoDevice *_this, const char *path)
 #ifdef SKIP_GDI_SWAPBUFFERS
         || !_this->gl_data->wglSwapBuffers
 #endif
-#if defined(__XBOXONE__) || defined(__XBOXSERIES__)
-        || !_this->gl_data->wglDescribePixelFormat ||
+#if defined(SDL_PLATFORM_XBOXONE) || defined(SDL_PLATFORM_XBOXSERIES)
+        !_this->gl_data->wglDescribePixelFormat ||
         !_this->gl_data->wglChoosePixelFormat ||
         !_this->gl_data->wglGetPixelFormat ||
         !_this->gl_data->wglSetPixelFormat
@@ -220,13 +220,13 @@ int WIN_GL_LoadLibrary(SDL_VideoDevice *_this, const char *path)
 
 SDL_FunctionPointer WIN_GL_GetProcAddress(SDL_VideoDevice *_this, const char *proc)
 {
-    void *func;
+    SDL_FunctionPointer func;
 
     /* This is to pick up extensions */
-    func = _this->gl_data->wglGetProcAddress(proc);
+    func = (SDL_FunctionPointer)_this->gl_data->wglGetProcAddress(proc);
     if (!func) {
         /* This is probably a normal GL function */
-        func = GetProcAddress(_this->gl_config.dll_handle, proc);
+        func = (SDL_FunctionPointer)GetProcAddress(_this->gl_config.dll_handle, proc);
     }
     return func;
 }
@@ -532,6 +532,9 @@ static int WIN_GL_ChoosePixelFormatARB(SDL_VideoDevice *_this, int *iAttribs, fl
     int pixel_format = 0;
     unsigned int matching;
 
+    int qAttrib = WGL_FRAMEBUFFER_SRGB_CAPABLE_ARB;
+    int srgb = 0;
+
     hwnd =
         CreateWindow(SDL_Appname, SDL_Appname, (WS_POPUP | WS_DISABLED), 0, 0,
                      10, 10, NULL, NULL, SDL_Instance, NULL);
@@ -551,6 +554,10 @@ static int WIN_GL_ChoosePixelFormatARB(SDL_VideoDevice *_this, int *iAttribs, fl
             _this->gl_data->wglChoosePixelFormatARB(hdc, iAttribs, fAttribs,
                                                     1, &pixel_format,
                                                     &matching);
+
+            /* Check whether we actually got an SRGB capable buffer */
+            _this->gl_data->wglGetPixelFormatAttribivARB(hdc, pixel_format, 0, 1, &qAttrib, &srgb);
+            _this->gl_config.framebuffer_srgb_capable = srgb;
         }
 
         _this->gl_data->wglMakeCurrent(hdc, NULL);
@@ -897,21 +904,6 @@ int WIN_GL_DeleteContext(SDL_VideoDevice *_this, SDL_GLContext context)
     }
     _this->gl_data->wglDeleteContext((HGLRC)context);
     return 0;
-}
-
-SDL_bool WIN_GL_SetPixelFormatFrom(SDL_VideoDevice *_this, SDL_Window *fromWindow, SDL_Window *toWindow)
-{
-    HDC hfromdc = fromWindow->driverdata->hdc;
-    HDC htodc = toWindow->driverdata->hdc;
-
-    /* get the pixel format of the fromWindow */
-    int pixel_format = GetPixelFormat(hfromdc);
-    PIXELFORMATDESCRIPTOR pfd;
-    SDL_memset(&pfd, 0, sizeof(pfd));
-    DescribePixelFormat(hfromdc, pixel_format, sizeof(pfd), &pfd);
-
-    /* set the pixel format of the toWindow */
-    return SetPixelFormat(htodc, pixel_format, &pfd);
 }
 
 #endif /* SDL_VIDEO_OPENGL_WGL */

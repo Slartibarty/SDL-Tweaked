@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -35,7 +35,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#if defined(__FREEBSD__) || defined(__OPENBSD__)
+#if defined(SDL_PLATFORM_FREEBSD) || defined(SDL_PLATFORM_OPENBSD)
 #include <sys/sysctl.h>
 #endif
 
@@ -48,7 +48,6 @@ static char *readSymLink(const char *path)
     while (1) {
         char *ptr = (char *)SDL_realloc(retval, (size_t)len);
         if (!ptr) {
-            SDL_OutOfMemory();
             break;
         }
 
@@ -69,7 +68,7 @@ static char *readSymLink(const char *path)
     return NULL;
 }
 
-#ifdef __OPENBSD__
+#ifdef SDL_PLATFORM_OPENBSD
 static char *search_path_for_binary(const char *bin)
 {
     char *envr = SDL_getenv("PATH");
@@ -85,7 +84,6 @@ static char *search_path_for_binary(const char *bin)
 
     envr = SDL_strdup(envr);
     if (!envr) {
-        SDL_OutOfMemory();
         return NULL;
     }
 
@@ -124,19 +122,18 @@ char *SDL_GetBasePath(void)
 {
     char *retval = NULL;
 
-#ifdef __FREEBSD__
+#ifdef SDL_PLATFORM_FREEBSD
     char fullpath[PATH_MAX];
     size_t buflen = sizeof(fullpath);
     const int mib[] = { CTL_KERN, KERN_PROC, KERN_PROC_PATHNAME, -1 };
     if (sysctl(mib, SDL_arraysize(mib), fullpath, &buflen, NULL, 0) != -1) {
         retval = SDL_strdup(fullpath);
         if (!retval) {
-            SDL_OutOfMemory();
             return NULL;
         }
     }
 #endif
-#ifdef __OPENBSD__
+#ifdef SDL_PLATFORM_OPENBSD
     /* Please note that this will fail if the process was launched with a relative path and $PWD + the cwd have changed, or argv is altered. So don't do that. Or add a new sysctl to OpenBSD. */
     char **cmdline;
     size_t len;
@@ -145,14 +142,12 @@ char *SDL_GetBasePath(void)
         char *exe, *pwddst;
         char *realpathbuf = (char *)SDL_malloc(PATH_MAX + 1);
         if (!realpathbuf) {
-            SDL_OutOfMemory();
             return NULL;
         }
 
         cmdline = SDL_malloc(len);
         if (!cmdline) {
             SDL_free(realpathbuf);
-            SDL_OutOfMemory();
             return NULL;
         }
 
@@ -201,11 +196,11 @@ char *SDL_GetBasePath(void)
         /* !!! FIXME: after 2.0.6 ships, let's delete this code and just
                       use the /proc/%llu version. There's no reason to have
                       two copies of this plus all the #ifdefs. --ryan. */
-#ifdef __FREEBSD__
+#ifdef SDL_PLATFORM_FREEBSD
         retval = readSymLink("/proc/curproc/file");
-#elif defined(__NETBSD__)
+#elif defined(SDL_PLATFORM_NETBSD)
         retval = readSymLink("/proc/curproc/exe");
-#elif defined(__SOLARIS__)
+#elif defined(SDL_PLATFORM_SOLARIS)
         retval = readSymLink("/proc/self/path/a.out");
 #else
         retval = readSymLink("/proc/self/exe"); /* linux. */
@@ -222,13 +217,12 @@ char *SDL_GetBasePath(void)
 #endif
     }
 
-#ifdef __SOLARIS__  /* try this as a fallback if /proc didn't pan out */
+#ifdef SDL_PLATFORM_SOLARIS  /* try this as a fallback if /proc didn't pan out */
     if (!retval) {
         const char *path = getexecname();
         if ((path) && (path[0] == '/')) { /* must be absolute path... */
             retval = SDL_strdup(path);
             if (!retval) {
-                SDL_OutOfMemory();
                 return NULL;
             }
         }
@@ -302,7 +296,6 @@ char *SDL_GetPrefPath(const char *org, const char *app)
     len += SDL_strlen(append) + SDL_strlen(org) + SDL_strlen(app) + 3;
     retval = (char *)SDL_malloc(len);
     if (!retval) {
-        SDL_OutOfMemory();
         return NULL;
     }
 
@@ -502,15 +495,14 @@ static char *xdg_user_dir_lookup (const char *type)
         return NULL;
 
     /* Special case desktop for historical compatibility */
-    if (SDL_strcmp(type, "DESKTOP") == 0)
-    {
-        user_dir = (char*) SDL_malloc(SDL_strlen(home_dir) +
-                                      SDL_strlen("/Desktop") + 1);
+    if (SDL_strcmp(type, "DESKTOP") == 0) {
+        size_t length = SDL_strlen(home_dir) + SDL_strlen("/Desktop") + 1;
+        user_dir = (char*) SDL_malloc(length);
         if (!user_dir)
             return NULL;
 
-        strcpy(user_dir, home_dir);
-        strcat(user_dir, "/Desktop");
+        SDL_strlcpy(user_dir, home_dir, length);
+        SDL_strlcat(user_dir, "/Desktop", length);
         return user_dir;
     }
 
@@ -541,13 +533,7 @@ char *SDL_GetUserFolder(SDL_Folder folder)
             return NULL;
         }
 
-        retval = SDL_strdup(param);
-
-        if (!retval) {
-            SDL_OutOfMemory();
-        }
-
-        return retval;
+        return SDL_strdup(param);
 
     case SDL_FOLDER_DESKTOP:
         param = "DESKTOP";

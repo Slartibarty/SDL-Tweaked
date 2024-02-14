@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -689,7 +689,6 @@ static void registry_event_global_callback(void *object, uint32_t id, uint32_t p
                 node->userdata = io = SDL_calloc(1, sizeof(struct io_node) + desc_buffer_len + path_buffer_len);
                 if (!io) {
                     node_object_destroy(node);
-                    SDL_OutOfMemory();
                     return;
                 }
 
@@ -827,11 +826,13 @@ static void PIPEWIRE_DetectDevices(SDL_AudioDevice **default_output, SDL_AudioDe
     spa_list_for_each (io, &hotplug_io_list, link) {
         SDL_AudioDevice *device = SDL_AddAudioDevice(io->is_capture, io->name, &io->spec, PW_ID_TO_HANDLE(io->id));
         if (pipewire_default_sink_id && SDL_strcmp(io->path, pipewire_default_sink_id) == 0) {
-            SDL_assert(!io->is_capture);
-            *default_output = device;
+            if (!io->is_capture) {
+                *default_output = device;
+            }
         } else if (pipewire_default_source_id && SDL_strcmp(io->path, pipewire_default_source_id) == 0) {
-            SDL_assert(io->is_capture);
-            *default_capture = device;
+            if (io->is_capture) {
+                *default_capture = device;
+            }
         }
     }
 
@@ -1105,7 +1106,7 @@ static int PIPEWIRE_OpenDevice(SDL_AudioDevice *device)
     priv = SDL_calloc(1, sizeof(struct SDL_PrivateAudioData));
     device->hidden = priv;
     if (!priv) {
-        return SDL_OutOfMemory();
+        return -1;
     }
 
     // Size of a single audio frame in bytes

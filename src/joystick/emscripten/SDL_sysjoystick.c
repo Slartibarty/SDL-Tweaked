@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -269,6 +269,11 @@ static const char *EMSCRIPTEN_JoystickGetDevicePath(int device_index)
     return NULL;
 }
 
+static int EMSCRIPTEN_JoystickGetDeviceSteamVirtualGamepadSlot(int device_index)
+{
+    return -1;
+}
+
 static int EMSCRIPTEN_JoystickGetDevicePlayerIndex(int device_index)
 {
     return -1;
@@ -390,11 +395,6 @@ static SDL_bool EMSCRIPTEN_JoystickGetGamepadMapping(int device_index, SDL_Gamep
     return SDL_FALSE;
 }
 
-static Uint32 EMSCRIPTEN_JoystickGetCapabilities(SDL_Joystick *joystick)
-{
-    return 0;
-}
-
 static int EMSCRIPTEN_JoystickSetLED(SDL_Joystick *joystick, Uint8 red, Uint8 green, Uint8 blue)
 {
     return SDL_Unsupported();
@@ -416,6 +416,7 @@ SDL_JoystickDriver SDL_EMSCRIPTEN_JoystickDriver = {
     EMSCRIPTEN_JoystickDetect,
     EMSCRIPTEN_JoystickGetDeviceName,
     EMSCRIPTEN_JoystickGetDevicePath,
+    EMSCRIPTEN_JoystickGetDeviceSteamVirtualGamepadSlot,
     EMSCRIPTEN_JoystickGetDevicePlayerIndex,
     EMSCRIPTEN_JoystickSetDevicePlayerIndex,
     EMSCRIPTEN_JoystickGetDeviceGUID,
@@ -423,7 +424,6 @@ SDL_JoystickDriver SDL_EMSCRIPTEN_JoystickDriver = {
     EMSCRIPTEN_JoystickOpen,
     EMSCRIPTEN_JoystickRumble,
     EMSCRIPTEN_JoystickRumbleTriggers,
-    EMSCRIPTEN_JoystickGetCapabilities,
     EMSCRIPTEN_JoystickSetLED,
     EMSCRIPTEN_JoystickSendEffect,
     EMSCRIPTEN_JoystickSetSensorsEnabled,

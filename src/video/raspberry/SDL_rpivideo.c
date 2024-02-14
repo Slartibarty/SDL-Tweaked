@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -77,14 +77,12 @@ static SDL_VideoDevice *RPI_Create()
     /* Initialize SDL_VideoDevice structure */
     device = (SDL_VideoDevice *)SDL_calloc(1, sizeof(SDL_VideoDevice));
     if (!device) {
-        SDL_OutOfMemory();
         return NULL;
     }
 
     /* Initialize internal data */
     phdata = (SDL_VideoData *)SDL_calloc(1, sizeof(SDL_VideoData));
     if (!phdata) {
-        SDL_OutOfMemory();
         SDL_free(device);
         return NULL;
     }
@@ -101,7 +99,6 @@ static SDL_VideoDevice *RPI_Create()
     device->VideoInit = RPI_VideoInit;
     device->VideoQuit = RPI_VideoQuit;
     device->CreateSDLWindow = RPI_CreateWindow;
-    device->CreateSDLWindowFrom = RPI_CreateWindowFrom;
     device->SetWindowTitle = RPI_SetWindowTitle;
     device->SetWindowPosition = RPI_SetWindowPosition;
     device->SetWindowSize = RPI_SetWindowSize;
@@ -129,9 +126,10 @@ static SDL_VideoDevice *RPI_Create()
 }
 
 VideoBootStrap RPI_bootstrap = {
-    "RPI",
+    "rpi",
     "RPI Video Driver",
-    RPI_Create
+    RPI_Create,
+    NULL /* no ShowMessageBox implementation */
 };
 
 /*****************************************************************************/
@@ -217,7 +215,7 @@ static void RPI_vsync_callback(DISPMANX_UPDATE_HANDLE_T u, void *data)
     SDL_UnlockMutex(wdata->vsync_cond_mutex);
 }
 
-int RPI_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window)
+int RPI_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_PropertiesID create_props)
 {
     SDL_WindowData *wdata;
     SDL_VideoDisplay *display;
@@ -237,7 +235,7 @@ int RPI_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window)
     /* Allocate window internal data */
     wdata = (SDL_WindowData *)SDL_calloc(1, sizeof(SDL_WindowData));
     if (!wdata) {
-        return SDL_OutOfMemory();
+        return -1;
     }
     display = SDL_GetVideoDisplayForWindow(window);
     displaydata = display->driverdata;
@@ -337,11 +335,6 @@ void RPI_DestroyWindow(SDL_VideoDevice *_this, SDL_Window *window)
         SDL_free(data);
         window->driverdata = NULL;
     }
-}
-
-int RPI_CreateWindowFrom(SDL_VideoDevice *_this, SDL_Window *window, const void *data)
-{
-    return -1;
 }
 
 void RPI_SetWindowTitle(SDL_VideoDevice *_this, SDL_Window *window)

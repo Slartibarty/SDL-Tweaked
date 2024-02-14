@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -24,9 +24,7 @@
 
 #include "SDL_syssensor.h"
 
-#ifndef SDL_EVENTS_DISABLED
 #include "../events/SDL_events_c.h"
-#endif
 #include "../joystick/SDL_gamepad_c.h"
 
 static SDL_SensorDriver *SDL_sensor_drivers[] = {
@@ -132,11 +130,9 @@ int SDL_InitSensors(void)
         SDL_sensor_lock = SDL_CreateMutex();
     }
 
-#ifndef SDL_EVENTS_DISABLED
     if (SDL_InitSubSystem(SDL_INIT_EVENTS) < 0) {
         return -1;
     }
-#endif /* !SDL_EVENTS_DISABLED */
 
     SDL_LockSensors();
 
@@ -208,8 +204,6 @@ SDL_SensorID *SDL_GetSensors(int *count)
             if (count) {
                 *count = 0;
             }
-
-            SDL_OutOfMemory();
         }
     }
     SDL_UnlockSensors();
@@ -238,7 +232,7 @@ static SDL_bool SDL_GetDriverAndSensorIndex(SDL_SensorID instance_id, SDL_Sensor
             }
         }
     }
-    SDL_SetError("Sensor %" SDL_PRIs32 " not found", instance_id);
+    SDL_SetError("Sensor %" SDL_PRIu32 " not found", instance_id);
     return SDL_FALSE;
 }
 
@@ -330,7 +324,6 @@ SDL_Sensor *SDL_OpenSensor(SDL_SensorID instance_id)
     /* Create and initialize the sensor */
     sensor = (SDL_Sensor *)SDL_calloc(sizeof(*sensor), 1);
     if (!sensor) {
-        SDL_OutOfMemory();
         SDL_UnlockSensors();
         return NULL;
     }
@@ -556,9 +549,7 @@ void SDL_QuitSensors(void)
         SDL_sensor_drivers[i]->Quit();
     }
 
-#ifndef SDL_EVENTS_DISABLED
     SDL_QuitSubSystem(SDL_INIT_EVENTS);
-#endif
 
     SDL_sensors_initialized = SDL_FALSE;
 
@@ -581,7 +572,6 @@ int SDL_SendSensorUpdate(Uint64 timestamp, SDL_Sensor *sensor, Uint64 sensor_tim
 
     /* Post the event, if desired */
     posted = 0;
-#ifndef SDL_EVENTS_DISABLED
     if (SDL_EventEnabled(SDL_EVENT_SENSOR_UPDATE)) {
         SDL_Event event;
         event.type = SDL_EVENT_SENSOR_UPDATE;
@@ -593,7 +583,6 @@ int SDL_SendSensorUpdate(Uint64 timestamp, SDL_Sensor *sensor, Uint64 sensor_tim
         event.sensor.sensor_timestamp = sensor_timestamp;
         posted = SDL_PushEvent(&event) == 1;
     }
-#endif /* !SDL_EVENTS_DISABLED */
 
     SDL_GamepadSensorWatcher(timestamp, sensor->instance_id, sensor_timestamp, data, num_values);
 

@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -52,21 +52,18 @@ static SDL_VideoDevice *PSP_Create()
     /* Initialize SDL_VideoDevice structure */
     device = (SDL_VideoDevice *)SDL_calloc(1, sizeof(SDL_VideoDevice));
     if (!device) {
-        SDL_OutOfMemory();
         return NULL;
     }
 
     /* Initialize internal PSP specific data */
     phdata = (SDL_VideoData *)SDL_calloc(1, sizeof(SDL_VideoData));
     if (!phdata) {
-        SDL_OutOfMemory();
         SDL_free(device);
         return NULL;
     }
 
     gldata = (SDL_GLDriverData *)SDL_calloc(1, sizeof(SDL_GLDriverData));
     if (!gldata) {
-        SDL_OutOfMemory();
         SDL_free(device);
         SDL_free(phdata);
         return NULL;
@@ -89,7 +86,6 @@ static SDL_VideoDevice *PSP_Create()
     device->GetDisplayModes = PSP_GetDisplayModes;
     device->SetDisplayMode = PSP_SetDisplayMode;
     device->CreateSDLWindow = PSP_CreateWindow;
-    device->CreateSDLWindowFrom = PSP_CreateWindowFrom;
     device->SetWindowTitle = PSP_SetWindowTitle;
     device->SetWindowPosition = PSP_SetWindowPosition;
     device->SetWindowSize = PSP_SetWindowSize;
@@ -120,9 +116,10 @@ static SDL_VideoDevice *PSP_Create()
 }
 
 VideoBootStrap PSP_bootstrap = {
-    "PSP",
+    "psp",
     "PSP Video Driver",
-    PSP_Create
+    PSP_Create,
+    NULL /* no ShowMessageBox implementation */
 };
 
 /*****************************************************************************/
@@ -131,6 +128,10 @@ VideoBootStrap PSP_bootstrap = {
 int PSP_VideoInit(SDL_VideoDevice *_this)
 {
     SDL_DisplayMode mode;
+
+    if (PSP_EventInit(_this) == -1) {
+        return -1;  /* error string would already be set */
+    }
 
     SDL_zero(mode);
     mode.w = 480;
@@ -148,6 +149,7 @@ int PSP_VideoInit(SDL_VideoDevice *_this)
 
 void PSP_VideoQuit(SDL_VideoDevice *_this)
 {
+    PSP_EventQuit(_this);
 }
 
 int PSP_GetDisplayModes(SDL_VideoDevice *_this, SDL_VideoDisplay *display)
@@ -186,14 +188,14 @@ int PSP_SetDisplayMode(SDL_VideoDevice *_this, SDL_VideoDisplay *display, SDL_Di
         }                                      \
     } while (0)
 
-int PSP_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window)
+int PSP_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_PropertiesID create_props)
 {
     SDL_WindowData *wdata;
 
     /* Allocate window internal data */
     wdata = (SDL_WindowData *)SDL_calloc(1, sizeof(SDL_WindowData));
     if (!wdata) {
-        return SDL_OutOfMemory();
+        return -1;
     }
 
     /* Setup driver data for this window */
@@ -203,11 +205,6 @@ int PSP_CreateWindow(SDL_VideoDevice *_this, SDL_Window *window)
 
     /* Window has been successfully created */
     return 0;
-}
-
-int PSP_CreateWindowFrom(SDL_VideoDevice *_this, SDL_Window *window, const void *data)
-{
-    return SDL_Unsupported();
 }
 
 void PSP_SetWindowTitle(SDL_VideoDevice *_this, SDL_Window *window)

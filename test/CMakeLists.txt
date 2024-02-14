@@ -32,11 +32,35 @@ add_library(sdltests_utils OBJECT
 target_link_libraries(sdltests_utils PRIVATE SDL3::Headers)
 
 file(GLOB RESOURCE_FILES *.bmp *.wav *.hex moose.dat utf8.txt)
+
+if(CMAKE_RUNTIME_OUTPUT_DIRECTORY)
+    set(test_bin_dir "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+    if(NOT IS_ABSOLUTE "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+        set(test_bin_dir "${CMAKE_CURRENT_BINARY_DIR}/${CMAKE_RUNTIME_OUTPUT_DIRECTORY}")
+    endif()
+else()
+    set(test_bin_dir "${CMAKE_CURRENT_BINARY_DIR}")
+endif()
+if(NOT CMAKE_VERSION VERSION_LESS 3.20)
+    get_property(is_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+    set(test_bin_dir "${test_bin_dir}$<$<BOOL:${is_multi_config}>:/$<CONFIG>>")
+endif()
+
 set(RESOURCE_FILE_NAMES)
-foreach(RESOURCE_FILE IN LISTS RESOURCE_FILES)
-    get_filename_component(res_file_name ${RESOURCE_FILE} NAME)
+set(RESOURCE_FILES_BINDIR)
+foreach(resource_file IN LISTS RESOURCE_FILES)
+    get_filename_component(res_file_name ${resource_file} NAME)
     list(APPEND RESOURCE_FILE_NAMES "${res_file_name}")
+    set(resource_file_bindir "${test_bin_dir}/${res_file_name}")
+    add_custom_command(OUTPUT "${resource_file_bindir}"
+        COMMAND "${CMAKE_COMMAND}" -E copy "${resource_file}" "${resource_file_bindir}"
+        DEPENDS "${resource_file}"
+    )
+    list(APPEND RESOURCE_FILES_BINDIR "${resource_file_bindir}")
 endforeach()
+add_custom_target(copy-sdl-test-resources
+    DEPENDS "${RESOURCE_FILES_BINDIR}"
+)
 
 define_property(TARGET PROPERTY SDL_NONINTERACTIVE BRIEF_DOCS "If true, target is a non-interactive test executable." FULL_DOCS "If true, target is a noninteractive test executable.")
 define_property(TARGET PROPERTY SDL_NONINTERACTIVE_ARGUMENTS BRIEF_DOCS "Argument(s) to run executable in non-interactive mode." FULL_DOCS "Argument(s) to run executable in non-interactive mode.")
@@ -134,8 +158,7 @@ macro(add_sdl_test_executable TARGET)
             )
             add_dependencies(${TARGET} zzz-resources-copy-${TARGET})
         else()
-            add_custom_command(TARGET ${TARGET} POST_BUILD
-                COMMAND ${CMAKE_COMMAND} ARGS -E copy_if_different ${RESOURCE_FILES} $<TARGET_FILE_DIR:${TARGET}>)
+            add_dependencies(${TARGET} copy-sdl-test-resources)
         endif()
         if(APPLE)
             # Make sure resource files get installed into macOS/iOS .app bundles.
@@ -207,8 +230,7 @@ endif()
 if(FFmpeg_FOUND AND LIBAVUTIL_AVFRAME_HAS_CH_LAYOUT)
     add_sdl_test_executable(testffmpeg NO_C90 SOURCES testffmpeg.c ${icon_bmp_header})
     if(APPLE)
-        target_sources(testffmpeg PRIVATE testffmpeg_videotoolbox.m)
-        target_link_options(testffmpeg PRIVATE "-Wl,-framework,CoreFoundation" "-Wl,-framework,CoreVideo" "-Wl,-framework,Metal")
+        target_link_options(testffmpeg PRIVATE "-Wl,-framework,CoreVideo")
     endif()
     if(HAVE_OPENGLES_V2)
         message(DEBUG "Enabling EGL support in testffmpeg")
@@ -265,9 +287,20 @@ if(APPLE)
     endif()
 elseif(WINDOWS)
     add_sdl_test_executable(testnative BUILD_DEPENDENT NEEDS_RESOURCES TESTUTILS SOURCES testnative.c testnativew32.c)
-elseif(HAVE_X11)
-    add_sdl_test_executable(testnative BUILD_DEPENDENT NEEDS_RESOURCES TESTUTILS SOURCES testnative.c testnativex11.c)
-    target_link_libraries(testnative PRIVATE X11)
+elseif(HAVE_X11 OR HAVE_WAYLAND)
+    add_sdl_test_executable(testnative BUILD_DEPENDENT NO_C90 NEEDS_RESOURCES TESTUTILS SOURCES testnative.c)
+    if(HAVE_X11)
+        target_sources(testnative PRIVATE testnativex11.c)
+        target_link_libraries(testnative PRIVATE X11)
+    endif()
+    if(HAVE_WAYLAND)
+        set_property(SOURCE ${SDL3_BINARY_DIR}/wayland-generated-protocols/xdg-shell-protocol.c PROPERTY GENERATED 1)
+        target_sources(testnative PRIVATE testnativewayland.c ${SDL3_BINARY_DIR}/wayland-generated-protocols/xdg-shell-protocol.c)
+
+        # Needed to silence the documentation warning in the generated header file
+        target_compile_options(testnative PRIVATE -Wno-documentation-unknown-command)
+        target_link_libraries(testnative PRIVATE wayland-client)
+    endif ()
 endif()
 
 find_package(Python3)
@@ -314,8 +347,10 @@ files2headers(gamepad_image_headers
     gamepad_touchpad.bmp
 )
 files2headers(icon_bmp_header icon.bmp)
+files2headers(glass_bmp_header glass.bmp)
 
 add_sdl_test_executable(testaudio MAIN_CALLBACKS NEEDS_RESOURCES TESTUTILS SOURCES testaudio.c)
+add_sdl_test_executable(testcolorspace SOURCES testcolorspace.c)
 add_sdl_test_executable(testfile NONINTERACTIVE SOURCES testfile.c)
 add_sdl_test_executable(testcontroller TESTUTILS SOURCES testcontroller.c gamepadutils.c ${gamepad_image_headers})
 add_sdl_test_executable(testgeometry TESTUTILS SOURCES testgeometry.c)
@@ -328,6 +363,7 @@ add_sdl_test_executable(testgles2 SOURCES testgles2.c)
 add_sdl_test_executable(testgles2_sdf NEEDS_RESOURCES TESTUTILS SOURCES testgles2_sdf.c)
 add_sdl_test_executable(testhaptic SOURCES testhaptic.c)
 add_sdl_test_executable(testhotplug SOURCES testhotplug.c)
+add_sdl_test_executable(testpen SOURCES testpen.c)
 add_sdl_test_executable(testrumble SOURCES testrumble.c)
 add_sdl_test_executable(testthread NONINTERACTIVE NONINTERACTIVE_TIMEOUT 40 SOURCES testthread.c)
 add_sdl_test_executable(testiconv NEEDS_RESOURCES TESTUTILS SOURCES testiconv.c)
@@ -351,7 +387,7 @@ add_sdl_test_executable(testscale NEEDS_RESOURCES TESTUTILS SOURCES testscale.c)
 add_sdl_test_executable(testsem NONINTERACTIVE NONINTERACTIVE_ARGS 10 NONINTERACTIVE_TIMEOUT 30 SOURCES testsem.c)
 add_sdl_test_executable(testsensor SOURCES testsensor.c)
 add_sdl_test_executable(testshader NEEDS_RESOURCES TESTUTILS SOURCES testshader.c)
-add_sdl_test_executable(testshape NEEDS_RESOURCES SOURCES testshape.c)
+add_sdl_test_executable(testshape NEEDS_RESOURCES SOURCES testshape.c ${glass_bmp_header})
 add_sdl_test_executable(testsprite MAIN_CALLBACKS NEEDS_RESOURCES TESTUTILS SOURCES testsprite.c)
 add_sdl_test_executable(testspriteminimal SOURCES testspriteminimal.c ${icon_bmp_header})
 add_sdl_test_executable(teststreaming NEEDS_RESOURCES TESTUTILS SOURCES teststreaming.c)
@@ -373,6 +409,15 @@ add_sdl_test_executable(testcustomcursor SOURCES testcustomcursor.c)
 add_sdl_test_executable(testvulkan NO_C90 SOURCES testvulkan.c)
 add_sdl_test_executable(testoffscreen SOURCES testoffscreen.c)
 add_sdl_test_executable(testpopup SOURCES testpopup.c)
+
+if (HAVE_WAYLAND)
+    # Set the GENERATED property on the protocol file, since it is first created at build time
+    set_property(SOURCE ${SDL3_BINARY_DIR}/wayland-generated-protocols/xdg-shell-protocol.c PROPERTY GENERATED 1)
+    add_sdl_test_executable(testwaylandcustom NO_C90 NEEDS_RESOURCES SOURCES testwaylandcustom.c ${SDL3_BINARY_DIR}/wayland-generated-protocols/xdg-shell-protocol.c)
+    # Needed to silence the documentation warning in the generated header file
+    target_compile_options(testwaylandcustom PRIVATE -Wno-documentation-unknown-command)
+    target_link_libraries(testwaylandcustom PRIVATE wayland-client)
+endif()
 
 check_c_compiler_flag(-Wformat-overflow HAVE_WFORMAT_OVERFLOW)
 if(HAVE_WFORMAT_OVERFLOW)
@@ -582,7 +627,7 @@ if(SDL_INSTALL_TESTS)
     )
 endif()
 
-if(ANDROID AND TARGET SDL3-jar)
+if(ANDROID AND TARGET SDL3::Jar)
     list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/../cmake/android")
     find_package(SdlAndroid MODULE)
     if(SdlAndroid_FOUND)
@@ -639,14 +684,14 @@ if(ANDROID AND TARGET SDL3-jar)
                 COMMAND ${CMAKE_COMMAND} -E make_directory "${classes_path}"
                 COMMAND ${Java_JAVAC_EXECUTABLE}
                     -source 1.8 -target 1.8
-                    -bootclasspath "$<TARGET_PROPERTY:SDL3-jar,OUTPUT>"
+                    -bootclasspath "$<TARGET_PROPERTY:SDL3::Jar,JAR_FILE>"
                     "${JAVA_PACKAGE_DIR}/SDLEntryTestActivity.java"
                     "${JAVA_PACKAGE_DIR}/SDLTestActivity.java"
                     $<TARGET_PROPERTY:${TEST}-apk-linked,JAVA_R>
-                    -cp "$<TARGET_PROPERTY:SDL3-jar,OUTPUT>:${path_android_jar}"
+                    -cp "$<TARGET_PROPERTY:SDL3::Jar,JAR_FILE>:${SDL_ANDROID_PLATFORM_ANDROID_JAR}"
                     -d "${classes_path}"
                 COMMAND ${Java_JAR_EXECUTABLE} cf "${OUT_JAR}" -C "${classes_path}" .
-                DEPENDS $<TARGET_PROPERTY:${TEST}-apk-linked,OUTPUTS> "$<TARGET_PROPERTY:SDL3-jar,OUTPUT>" "${JAVA_PACKAGE_DIR}/SDLTestActivity.java" "${JAVA_PACKAGE_DIR}/SDLEntryTestActivity.java"
+                DEPENDS $<TARGET_PROPERTY:${TEST}-apk-linked,OUTPUTS> "$<TARGET_PROPERTY:SDL3::Jar,JAR_FILE>" "${JAVA_PACKAGE_DIR}/SDLTestActivity.java" "${JAVA_PACKAGE_DIR}/SDLEntryTestActivity.java"
             )
             add_custom_target(${TEST}-jar DEPENDS "${OUT_JAR}")
             set_property(TARGET ${TEST}-jar PROPERTY OUTPUT "${OUT_JAR}")
@@ -662,10 +707,10 @@ if(ANDROID AND TARGET SDL3-jar)
                 OUTPUT "${classes_dex}"
                 COMMAND SdlAndroid::d8
                     $<TARGET_PROPERTY:${TEST}-jar,OUTPUT>
-                    $<TARGET_PROPERTY:SDL3-jar,OUTPUT>
-                    --lib "${path_android_jar}"
+                    $<TARGET_PROPERTY:SDL3::Jar,JAR_FILE>
+                    --lib "${SDL_ANDROID_PLATFORM_ANDROID_JAR}"
                     --output "${dexworkdir}"
-                DEPENDS $<TARGET_PROPERTY:${TEST}-jar,OUTPUT> $<TARGET_PROPERTY:SDL3-jar,OUTPUT>
+                DEPENDS $<TARGET_PROPERTY:${TEST}-jar,OUTPUT> $<TARGET_PROPERTY:SDL3::Jar,JAR_FILE>
             )
             add_custom_target(${TEST}-dex DEPENDS "${classes_dex}")
             set_property(TARGET ${TEST}-dex PROPERTY OUTPUT "${classes_dex}")

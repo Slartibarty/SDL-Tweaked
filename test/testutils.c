@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
   Copyright 2022 Collabora Ltd.
 
   This software is provided 'as-is', without any express or implied
@@ -36,7 +36,6 @@ GetNearbyFilename(const char *file)
 
         if (!path) {
             SDL_free(base);
-            SDL_OutOfMemory();
             return NULL;
         }
 
@@ -53,11 +52,7 @@ GetNearbyFilename(const char *file)
         SDL_free(path);
     }
 
-    path = SDL_strdup(file);
-    if (!path) {
-        SDL_OutOfMemory();
-    }
-    return path;
+    return SDL_strdup(file);
 }
 
 /**
@@ -73,16 +68,9 @@ char *
 GetResourceFilename(const char *user_specified, const char *def)
 {
     if (user_specified) {
-        char *ret = SDL_strdup(user_specified);
-
-        if (!ret) {
-            SDL_OutOfMemory();
-        }
-
-        return ret;
-    } else {
-        return GetNearbyFilename(def);
+        return SDL_strdup(user_specified);
     }
+    return GetNearbyFilename(def);
 }
 
 /**
@@ -116,9 +104,14 @@ LoadTexture(SDL_Renderer *renderer, const char *file, SDL_bool transparent,
         /* Set transparent pixel as the pixel at (0,0) */
         if (transparent) {
             if (temp->format->palette) {
-                SDL_SetSurfaceColorKey(temp, SDL_TRUE, *(Uint8 *)temp->pixels);
+                const Uint8 bpp = temp->format->bits_per_pixel;
+                const Uint8 mask = (1 << bpp) - 1;
+                if (SDL_PIXELORDER(temp->format->format) == SDL_BITMAPORDER_4321)
+                    SDL_SetSurfaceColorKey(temp, SDL_TRUE, (*(Uint8 *)temp->pixels) & mask);
+                else
+                    SDL_SetSurfaceColorKey(temp, SDL_TRUE, ((*(Uint8 *)temp->pixels) >> (8 - bpp)) & mask);
             } else {
-                switch (temp->format->BitsPerPixel) {
+                switch (temp->format->bits_per_pixel) {
                 case 15:
                     SDL_SetSurfaceColorKey(temp, SDL_TRUE,
                                     (*(Uint16 *)temp->pixels) & 0x00007FFF);

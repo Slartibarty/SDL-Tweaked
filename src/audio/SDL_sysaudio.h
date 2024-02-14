@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -256,6 +256,9 @@ struct SDL_AudioDevice
 {
     // A mutex for locking access to this struct
     SDL_Mutex *lock;
+
+    // A condition variable to protect device close, where we can't hold the device lock forever.
+    SDL_Condition *close_cond;
 
     // Reference count of the device; logical devices, device threads, etc, add to this.
     SDL_AtomicInt refcount;

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 #  Simple DirectMedia Layer
-#  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+#  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 #
 #  This software is provided 'as-is', without any express or implied
 #  warranty.  In no event will the authors be held liable for any damages
@@ -25,7 +25,7 @@
 #  It keeps the dynamic API jump table operating correctly.
 #
 #  OS-specific API:
-#   After running the script, you have to manually add #ifdef __WIN32__
+#   After running the script, you have to manually add #ifdef SDL_PLATFORM_WIN32
 #   or similar around the function in 'SDL_dynapi_procs.h'
 #
 
@@ -150,8 +150,12 @@ def main():
             func = func.replace(" SDL_PRINTF_VARARG_FUNC(1)", "");
             func = func.replace(" SDL_PRINTF_VARARG_FUNC(2)", "");
             func = func.replace(" SDL_PRINTF_VARARG_FUNC(3)", "");
+            func = func.replace(" SDL_PRINTF_VARARG_FUNCV(1)", "");
+            func = func.replace(" SDL_PRINTF_VARARG_FUNCV(2)", "");
+            func = func.replace(" SDL_PRINTF_VARARG_FUNCV(3)", "");
             func = func.replace(" SDL_WPRINTF_VARARG_FUNC(3)", "");
             func = func.replace(" SDL_SCANF_VARARG_FUNC(2)", "");
+            func = func.replace(" SDL_SCANF_VARARG_FUNCV(2)", "");
             func = func.replace(" __attribute__((analyzer_noreturn))", "");
             func = func.replace(" SDL_MALLOC", "");
             func = func.replace(" SDL_ALLOC_SIZE2(1, 2)", "");
@@ -379,7 +383,7 @@ def check_comment():
         if header != 'SDL_stdinc.h':
             parameter_name = i['parameter_name']
             for n in parameter_name:
-                if n != "" and "\\param " + n not in comment:
+                if n != "" and "\\param " + n not in comment and "\\param[out] " + n not in comment:
                     check_comment_header()
                     print("  In file %s: function %s() missing '\\param %s'" % (header, name, n));
 

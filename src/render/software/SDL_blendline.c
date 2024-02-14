@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -765,7 +765,7 @@ typedef void (*BlendLineFunc)(SDL_Surface *dst,
 
 static BlendLineFunc SDL_CalculateBlendLineFunc(const SDL_PixelFormat *fmt)
 {
-    switch (fmt->BytesPerPixel) {
+    switch (fmt->bytes_per_pixel) {
     case 2:
         if (fmt->Rmask == 0x7C00) {
             return SDL_BlendLine_RGB555;

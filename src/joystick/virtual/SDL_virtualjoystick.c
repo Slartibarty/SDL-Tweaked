@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -119,13 +119,13 @@ SDL_JoystickID SDL_JoystickAttachVirtualInner(const SDL_VirtualJoystickDesc *des
     }
     if (desc->version != SDL_VIRTUAL_JOYSTICK_DESC_VERSION) {
         /* Is this an old version that we can support? */
-        return SDL_SetError("Unsupported virtual joystick description version %d", desc->version);
+        return SDL_SetError("Unsupported virtual joystick description version %u", desc->version);
     }
 
     hwdata = SDL_calloc(1, sizeof(joystick_hwdata));
     if (!hwdata) {
         VIRTUAL_FreeHWData(hwdata);
-        return SDL_OutOfMemory();
+        return 0;
     }
     SDL_memcpy(&hwdata->desc, desc, sizeof(*desc));
 
@@ -203,14 +203,14 @@ SDL_JoystickID SDL_JoystickAttachVirtualInner(const SDL_VirtualJoystickDesc *des
         }
     }
 
-    hwdata->guid = SDL_CreateJoystickGUID(SDL_HARDWARE_BUS_VIRTUAL, hwdata->desc.vendor_id, hwdata->desc.product_id, 0, name, 'v', (Uint8)hwdata->desc.type);
+    hwdata->guid = SDL_CreateJoystickGUID(SDL_HARDWARE_BUS_VIRTUAL, hwdata->desc.vendor_id, hwdata->desc.product_id, 0, NULL, name, 'v', (Uint8)hwdata->desc.type);
 
     /* Allocate fields for different control-types */
     if (hwdata->desc.naxes > 0) {
         hwdata->axes = SDL_calloc(hwdata->desc.naxes, sizeof(Sint16));
         if (!hwdata->axes) {
             VIRTUAL_FreeHWData(hwdata);
-            return SDL_OutOfMemory();
+            return 0;
         }
 
         /* Trigger axes are at minimum value at rest */
@@ -225,14 +225,14 @@ SDL_JoystickID SDL_JoystickAttachVirtualInner(const SDL_VirtualJoystickDesc *des
         hwdata->buttons = SDL_calloc(hwdata->desc.nbuttons, sizeof(Uint8));
         if (!hwdata->buttons) {
             VIRTUAL_FreeHWData(hwdata);
-            return SDL_OutOfMemory();
+            return 0;
         }
     }
     if (hwdata->desc.nhats > 0) {
         hwdata->hats = SDL_calloc(hwdata->desc.nhats, sizeof(Uint8));
         if (!hwdata->hats) {
             VIRTUAL_FreeHWData(hwdata);
-            return SDL_OutOfMemory();
+            return 0;
         }
     }
 
@@ -367,6 +367,11 @@ static const char *VIRTUAL_JoystickGetDevicePath(int device_index)
     return NULL;
 }
 
+static int VIRTUAL_JoystickGetDeviceSteamVirtualGamepadSlot(int device_index)
+{
+    return -1;
+}
+
 static int VIRTUAL_JoystickGetDevicePlayerIndex(int device_index)
 {
     return -1;
@@ -417,6 +422,16 @@ static int VIRTUAL_JoystickOpen(SDL_Joystick *joystick, int device_index)
     joystick->nbuttons = hwdata->desc.nbuttons;
     joystick->nhats = hwdata->desc.nhats;
     hwdata->joystick = joystick;
+
+    if (hwdata->desc.SetLED) {
+        SDL_SetBooleanProperty(SDL_GetJoystickProperties(joystick), SDL_PROP_JOYSTICK_CAP_RGB_LED_BOOLEAN, SDL_TRUE);
+    }
+    if (hwdata->desc.Rumble) {
+        SDL_SetBooleanProperty(SDL_GetJoystickProperties(joystick), SDL_PROP_JOYSTICK_CAP_RUMBLE_BOOLEAN, SDL_TRUE);
+    }
+    if (hwdata->desc.RumbleTriggers) {
+        SDL_SetBooleanProperty(SDL_GetJoystickProperties(joystick), SDL_PROP_JOYSTICK_CAP_TRIGGER_RUMBLE_BOOLEAN, SDL_TRUE);
+    }
     return 0;
 }
 
@@ -458,28 +473,6 @@ static int VIRTUAL_JoystickRumbleTriggers(SDL_Joystick *joystick, Uint16 left_ru
     }
 
     return result;
-}
-
-static Uint32 VIRTUAL_JoystickGetCapabilities(SDL_Joystick *joystick)
-{
-    joystick_hwdata *hwdata;
-    Uint32 caps = 0;
-
-    SDL_AssertJoysticksLocked();
-
-    hwdata = joystick->hwdata;
-    if (hwdata) {
-        if (hwdata->desc.Rumble) {
-            caps |= SDL_JOYCAP_RUMBLE;
-        }
-        if (hwdata->desc.RumbleTriggers) {
-            caps |= SDL_JOYCAP_RUMBLE_TRIGGERS;
-        }
-        if (hwdata->desc.SetLED) {
-            caps |= SDL_JOYCAP_LED;
-        }
-    }
-    return caps;
 }
 
 static int VIRTUAL_JoystickSetLED(SDL_Joystick *joystick, Uint8 red, Uint8 green, Uint8 blue)
@@ -689,6 +682,36 @@ static SDL_bool VIRTUAL_JoystickGetGamepadMapping(int device_index, SDL_GamepadM
         out->left_paddle2.target = current_button++;
     }
 
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_TOUCHPAD))) {
+        out->touchpad.kind = EMappingKind_Button;
+        out->touchpad.target = current_button++;
+    }
+
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_MISC2))) {
+        out->misc2.kind = EMappingKind_Button;
+        out->misc2.target = current_button++;
+    }
+
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_MISC3))) {
+        out->misc3.kind = EMappingKind_Button;
+        out->misc3.target = current_button++;
+    }
+
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_MISC4))) {
+        out->misc4.kind = EMappingKind_Button;
+        out->misc4.target = current_button++;
+    }
+
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_MISC5))) {
+        out->misc5.kind = EMappingKind_Button;
+        out->misc5.target = current_button++;
+    }
+
+    if (current_button < hwdata->desc.nbuttons && (hwdata->desc.button_mask & (1 << SDL_GAMEPAD_BUTTON_MISC6))) {
+        out->misc6.kind = EMappingKind_Button;
+        out->misc6.target = current_button++;
+    }
+
     if (current_axis < hwdata->desc.naxes && (hwdata->desc.axis_mask & (1 << SDL_GAMEPAD_AXIS_LEFTX))) {
         out->leftx.kind = EMappingKind_Axis;
         out->leftx.target = current_axis++;
@@ -728,6 +751,7 @@ SDL_JoystickDriver SDL_VIRTUAL_JoystickDriver = {
     VIRTUAL_JoystickDetect,
     VIRTUAL_JoystickGetDeviceName,
     VIRTUAL_JoystickGetDevicePath,
+    VIRTUAL_JoystickGetDeviceSteamVirtualGamepadSlot,
     VIRTUAL_JoystickGetDevicePlayerIndex,
     VIRTUAL_JoystickSetDevicePlayerIndex,
     VIRTUAL_JoystickGetDeviceGUID,
@@ -735,7 +759,6 @@ SDL_JoystickDriver SDL_VIRTUAL_JoystickDriver = {
     VIRTUAL_JoystickOpen,
     VIRTUAL_JoystickRumble,
     VIRTUAL_JoystickRumbleTriggers,
-    VIRTUAL_JoystickGetCapabilities,
     VIRTUAL_JoystickSetLED,
     VIRTUAL_JoystickSendEffect,
     VIRTUAL_JoystickSetSensorsEnabled,

@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2023 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2024 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -705,9 +705,9 @@ void SDL_IBus_UpdateTextRect(const SDL_Rect *rect)
 #ifdef SDL_VIDEO_DRIVER_X11
     {
         SDL_PropertiesID props = SDL_GetWindowProperties(focused_win);
-        Display *x_disp = (Display *)SDL_GetProperty(props, "SDL.window.x11.display");
-        int x_screen = (int)(intptr_t)SDL_GetProperty(props, "SDL.window.x11.screen");
-        Window x_win = (Window)SDL_GetProperty(props, "SDL.window.x11.window");
+        Display *x_disp = (Display *)SDL_GetProperty(props, SDL_PROP_WINDOW_X11_DISPLAY_POINTER, NULL);
+        int x_screen = SDL_GetNumberProperty(props, SDL_PROP_WINDOW_X11_SCREEN_NUMBER, 0);
+        Window x_win = SDL_GetNumberProperty(props, SDL_PROP_WINDOW_X11_WINDOW_NUMBER, 0);
         Window unused;
 
         if (x_disp && x_win) {
