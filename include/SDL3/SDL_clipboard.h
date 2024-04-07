@@ -29,6 +29,7 @@
 #define SDL_clipboard_h_
 
 #include <SDL3/SDL_stdinc.h>
+#include <SDL3/SDL_error.h>
 
 #include <SDL3/SDL_begin_code.h>
 /* Set up for C function definitions, even when using C++ */
@@ -187,8 +188,7 @@ typedef void (SDLCALL *SDL_ClipboardCleanupCallback)(void *userdata);
  *
  * \since This function is available since SDL 3.0.0.
  *
- * \sa SDL_ClipboardDataCallback
- * \sa SDL_SetClipboardData
+ * \sa SDL_ClearClipboardData
  * \sa SDL_GetClipboardData
  * \sa SDL_HasClipboardData
  */

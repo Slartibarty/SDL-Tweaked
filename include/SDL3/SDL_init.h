@@ -29,6 +29,7 @@
 #define SDL_init_h_
 
 #include <SDL3/SDL_stdinc.h>
+#include <SDL3/SDL_error.h>
 
 #include <SDL3/SDL_begin_code.h>
 /* Set up for C function definitions, even when using C++ */
@@ -53,13 +54,14 @@ extern "C" {
 typedef enum
 {
     SDL_INIT_TIMER        = 0x00000001,
-    SDL_INIT_AUDIO        = 0x00000010,
+    SDL_INIT_AUDIO        = 0x00000010,  /**< `SDL_INIT_AUDIO` implies `SDL_INIT_EVENTS` */
     SDL_INIT_VIDEO        = 0x00000020,  /**< `SDL_INIT_VIDEO` implies `SDL_INIT_EVENTS` */
     SDL_INIT_JOYSTICK     = 0x00000200,  /**< `SDL_INIT_JOYSTICK` implies `SDL_INIT_EVENTS` */
     SDL_INIT_HAPTIC       = 0x00001000,
     SDL_INIT_GAMEPAD      = 0x00002000,  /**< `SDL_INIT_GAMEPAD` implies `SDL_INIT_JOYSTICK` */
     SDL_INIT_EVENTS       = 0x00004000,
-    SDL_INIT_SENSOR       = 0x00008000
+    SDL_INIT_SENSOR       = 0x00008000,  /**< `SDL_INIT_SENSOR` implies `SDL_INIT_EVENTS` */
+    SDL_INIT_CAMERA       = 0x00010000   /**< `SDL_INIT_CAMERA` implies `SDL_INIT_EVENTS` */
 } SDL_InitFlags;
 
 /**
@@ -69,7 +71,7 @@ typedef enum
  * two may be used interchangeably. Though for readability of your code
  * SDL_InitSubSystem() might be preferred.
  *
- * The file I/O (for example: SDL_RWFromFile) and threading (SDL_CreateThread)
+ * The file I/O (for example: SDL_IOFromFile) and threading (SDL_CreateThread)
  * subsystems are initialized by default. Message boxes
  * (SDL_ShowSimpleMessageBox) also attempt to work without initializing the
  * video subsystem, in hopes of being useful in showing an error dialog when

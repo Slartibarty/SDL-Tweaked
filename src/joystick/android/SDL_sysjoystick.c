@@ -205,7 +205,7 @@ int Android_OnPadDown(int device_id, int keycode)
         if (item && item->joystick) {
             SDL_SendJoystickButton(timestamp, item->joystick, button, SDL_PRESSED);
         } else {
-            SDL_SendKeyboardKey(timestamp, SDL_PRESSED, button_to_scancode(button));
+            SDL_SendKeyboardKey(timestamp, SDL_GLOBAL_KEYBOARD_ID, SDL_PRESSED, button_to_scancode(button));
         }
         SDL_UnlockJoysticks();
         return 0;
@@ -225,7 +225,7 @@ int Android_OnPadUp(int device_id, int keycode)
         if (item && item->joystick) {
             SDL_SendJoystickButton(timestamp, item->joystick, button, SDL_RELEASED);
         } else {
-            SDL_SendKeyboardKey(timestamp, SDL_RELEASED, button_to_scancode(button));
+            SDL_SendKeyboardKey(timestamp, SDL_GLOBAL_KEYBOARD_ID, SDL_RELEASED, button_to_scancode(button));
         }
         SDL_UnlockJoysticks();
         return 0;
@@ -321,12 +321,9 @@ int Android_AddJoystick(int device_id, const char *name, const char *desc, int v
         goto done;
     }
 
-#ifdef SDL_JOYSTICK_HIDAPI
-    if (HIDAPI_IsDevicePresent(vendor_id, product_id, 0, name)) {
-        /* The HIDAPI driver is taking care of this device */
+    if (SDL_JoystickHandledByAnotherDriver(&SDL_ANDROID_JoystickDriver, vendor_id, product_id, 0, name)) {
         goto done;
     }
-#endif
 
 #ifdef DEBUG_JOYSTICK
     SDL_Log("Joystick: %s, descriptor %s, vendor = 0x%.4x, product = 0x%.4x, %d axes, %d hats\n", name, desc, vendor_id, product_id, naxes, nhats);
@@ -482,6 +479,12 @@ static void ANDROID_JoystickDetect(void)
     }
 }
 
+static SDL_bool ANDROID_JoystickIsDevicePresent(Uint16 vendor_id, Uint16 product_id, Uint16 version, const char *name)
+{
+    /* We don't override any other drivers */
+    return SDL_FALSE;
+}
+
 static SDL_joylist_item *GetJoystickByDevIndex(int device_index)
 {
     SDL_joylist_item *item = SDL_joylist;
@@ -569,7 +572,6 @@ static int ANDROID_JoystickOpen(SDL_Joystick *joystick, int device_index)
         return SDL_SetError("Joystick already opened");
     }
 
-    joystick->instance_id = item->device_instance;
     joystick->hwdata = (struct joystick_hwdata *)item;
     item->joystick = joystick;
     joystick->nhats = item->nhats;
@@ -646,6 +648,7 @@ SDL_JoystickDriver SDL_ANDROID_JoystickDriver = {
     ANDROID_JoystickInit,
     ANDROID_JoystickGetCount,
     ANDROID_JoystickDetect,
+    ANDROID_JoystickIsDevicePresent,
     ANDROID_JoystickGetDeviceName,
     ANDROID_JoystickGetDevicePath,
     ANDROID_JoystickGetDeviceSteamVirtualGamepadSlot,

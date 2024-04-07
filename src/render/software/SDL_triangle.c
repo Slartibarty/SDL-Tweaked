@@ -20,7 +20,7 @@
 */
 #include "SDL_internal.h"
 
-#if SDL_VIDEO_RENDER_SW && !defined(SDL_RENDER_DISABLED)
+#if SDL_VIDEO_RENDER_SW
 
 #include <limits.h>
 
@@ -278,7 +278,7 @@ int SDL_SW_FillTriangle(SDL_Surface *dst, SDL_Point *d0, SDL_Point *d1, SDL_Poin
     }
 
     if (blend != SDL_BLENDMODE_NONE) {
-        int format = dst->format->format;
+        SDL_PixelFormatEnum format = dst->format->format;
 
         /* need an alpha format */
         if (!dst->format->Amask) {
@@ -300,7 +300,7 @@ int SDL_SW_FillTriangle(SDL_Surface *dst, SDL_Point *d0, SDL_Point *d1, SDL_Poin
         SDL_SetSurfaceBlendMode(tmp, blend);
 
         dstbpp = tmp->format->bytes_per_pixel;
-        dst_ptr = tmp->pixels;
+        dst_ptr = (Uint8 *)tmp->pixels;
         dst_pitch = tmp->pitch;
 
     } else {
@@ -465,7 +465,7 @@ int SDL_SW_BlitTriangle(
     Uint8 *dst_ptr;
     int dst_pitch;
 
-    int *src_ptr;
+    const int *src_ptr;
     int src_pitch;
 
     Sint64 area, tmp64;
@@ -583,7 +583,7 @@ int SDL_SW_BlitTriangle(
     dst_pitch = dst->pitch;
 
     /* Set source pointer */
-    src_ptr = src->pixels;
+    src_ptr = (const int *)src->pixels;
     src_pitch = src->pitch;
 
     is_clockwise = area > 0;
@@ -934,4 +934,4 @@ static void SDL_BlitTriangle_Slow(SDL_BlitInfo *info,
     TRIANGLE_END_LOOP
 }
 
-#endif /* SDL_VIDEO_RENDER_SW && !SDL_RENDER_DISABLED */
+#endif /* SDL_VIDEO_RENDER_SW */
